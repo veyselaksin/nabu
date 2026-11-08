@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "**/go.sum"
+      - name: gofmt
+        run: |
+          out=$(gofmt -l g2p api)
+          if [ -n "$out" ]; then echo "::error::gofmt needed:"; echo "$out"; exit 1; fi
+      - name: go vet
+        run: go vet ./g2p/... ./api/...
+      - name: go test
+        run: go test -race ./g2p/... ./api/...
+      - name: g2p builds for WASM
+        run: GOOS=js GOARCH=wasm go build ./g2p/...
+      - name: modules are tidy
+        run: |
+          (cd g2p && go mod tidy -diff)
+          (cd api && go mod tidy -diff)
+
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - name: ruff
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+      - name: pytest
+        run: uv run pytest
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - name: dependency licenses
+        run: npm run licenses
+      - run: npm run build
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: go
+    steps:
+      - uses: actions/checkout@v7
+      - name: build API image
+        run: docker build -f api/Dockerfile -t nabu-api:ci .

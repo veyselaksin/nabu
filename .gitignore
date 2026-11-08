@@ -1,0 +1,28 @@
+# Build output
+/bin/
+*.wasm
+web/dist/
+
+# Dependencies and caches
+web/node_modules/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Corpus data: never commit. Download scripts write here.
+/data/corpora/
+/data/raw/
+/data/processed/
+*.conllu
+*.atf
+
+# Local env / editors / OS
+.env
+.env.*
+!.env.example
+.idea/
+.vscode/
+.DS_Store

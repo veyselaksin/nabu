@@ -1,0 +1,8 @@
+# Golden outputs for rules/egy-allen.yaml (input<TAB>ipa).
+# The rule file is a PLACEHOLDER: these outputs only pin engine behaviour and
+# are not pronunciations. Regenerate with: go test ./g2p -run TestGolden -update
+ꜥnḫ	ʕnχ
+ḥtp	ħtp
+nfr	nfr
+ꜥnḫ.t	ʕnχt
+ꜥnḫ ḥtp	ʕnχ ħtp

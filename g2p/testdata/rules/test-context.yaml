@@ -1,0 +1,24 @@
+# Synthetic fixture: NOT linguistic data. Exercises longest-match-first,
+# file-order tie breaking, regex contexts and class expansion.
+id: test-context
+language: und
+name: Test fixture — context and longest match
+reference: none (test fixture)
+version: "1"
+classes:
+  V: [a, e, ee]
+graphemes:
+  - { match: "abc", ipa: "[ABC]" }
+  - { match: "ab", ipa: "[AB]" }
+  - { match: "a", ipa: "a" }
+  - { match: "b", ipa: "b" }
+  - { match: "e", ipa: "e" }
+  # c before a vowel class member -> K; after x -> Q; at word end -> Z; else C
+  - { match: "c", ipa: "K", context: { after: "{V}" } }
+  - { match: "c", ipa: "Q", context: { before: "x" } }
+  - { match: "c", ipa: "Z", context: { after: "(?:\\s|$)" } }
+  - { match: "c", ipa: "C" }
+  - { match: "x", ipa: "x" }
+  # Tie on length: first listed wins.
+  - { match: "y", ipa: "first" }
+  - { match: "y", ipa: "second", context: { before: "^" } }

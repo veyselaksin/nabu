@@ -1,0 +1,6 @@
+*
+!go.work
+!go.work.sum
+!g2p/
+!api/
+**/testdata/golden/*.orig

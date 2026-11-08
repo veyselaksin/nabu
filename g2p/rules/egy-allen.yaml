@@ -1,0 +1,45 @@
+# Middle Egyptian, following James P. Allen's historical reconstruction.
+#
+# !!! PLACEHOLDER RULE FILE !!!
+# None of the mappings below have been taken from Allen yet. They are toy
+# values that exist only so the engine, CLI, API and tests have something to
+# run against. Do NOT cite this file or its output as a pronunciation.
+#
+# A real reconstruction also needs vowels, which Egyptian transliteration does
+# not write; a grapheme-to-phoneme table alone cannot supply them. How Nabu
+# will model that (lexicon lookup, syllable templates, ...) is still open.
+#
+# TODO(source): replace every rule below with values from Allen (2013),
+#               citing the page/section for each one in a comment.
+id: egy-allen
+language: egy
+name: Middle Egyptian (Allen reconstruction) — PLACEHOLDER
+# TODO(source): rules not yet sourced from this reference; cite pages per rule,
+#               then drop the "PLACEHOLDER" prefix below.
+reference: >-
+  PLACEHOLDER (rules not yet taken from this work): Allen, James P. (2013).
+  The Ancient Egyptian Language: An Historical Study. Cambridge University Press.
+version: 0.0.0-placeholder
+graphemes:
+  # TODO(source): toy value, not from Allen — cite reference.
+  - { match: "ꜥ", ipa: "ʕ" }
+  # TODO(source): toy value, not from Allen — cite reference.
+  - { match: "ḥ", ipa: "ħ" }
+  # TODO(source): toy value, not from Allen — cite reference.
+  - { match: "ḫ", ipa: "χ" }
+  # TODO(source): toy value, not from Allen — cite reference.
+  - { match: "n", ipa: "n" }
+  # TODO(source): toy value, not from Allen — cite reference.
+  - { match: "t", ipa: "t" }
+  # TODO(source): toy value, not from Allen — cite reference.
+  - { match: "p", ipa: "p" }
+  # TODO(source): toy value, not from Allen — cite reference.
+  - { match: "f", ipa: "f" }
+  # TODO(source): toy value, not from Allen — cite reference.
+  - { match: "r", ipa: "r" }
+  # Morpheme boundary in transliteration (e.g. "ꜥnḫ.t"); explicitly silent.
+  # TODO(source): confirm which separators the transliteration standard uses.
+  - { match: ".", ipa: "" }
+notes: >-
+  Placeholder only. Covers just enough graphemes for the golden tests
+  (ꜥnḫ, ḥtp, nfr). Unknown graphemes raise an error rather than being dropped.

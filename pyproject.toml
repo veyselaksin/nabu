@@ -1,0 +1,40 @@
+# uv workspace for Nabu's Python packages. This root is not itself a package.
+[project]
+name = "nabu-workspace"
+version = "0.0.0"
+requires-python = ">=3.11"
+dependencies = ["nabu-translate", "nabu-tts", "nabu-eval", "nabu-data"]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["translate", "tts", "eval", "data"]
+
+[tool.uv.sources]
+nabu-translate = { workspace = true }
+nabu-tts = { workspace = true }
+nabu-eval = { workspace = true }
+nabu-data = { workspace = true }
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["web", "g2p", "api"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "ANN"]
+ignore = ["ANN401"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["nabu_translate", "nabu_tts", "nabu_eval", "nabu_data"]
+
+[tool.ruff.lint.per-file-ignores]
+"*/tests/*" = ["ANN"]
+
+[tool.pytest.ini_options]
+testpaths = ["translate/tests", "tts/tests", "eval/tests", "data/tests"]
+addopts = ["--import-mode=importlib", "-ra"]

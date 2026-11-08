@@ -1,0 +1,49 @@
+package config
+
+import (
+	"log/slog"
+	"testing"
+	"time"
+)
+
+func env(m map[string]string) func(string) string { return func(k string) string { return m[k] } }
+
+func TestFromEnvDefaults(t *testing.T) {
+	c, err := FromEnv(env(nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Addr != ":8080" || c.LogLevel != slog.LevelInfo || c.LogFormat != "json" ||
+		c.MaxTextRunes != 2000 || c.RequestTimeout != 10*time.Second || c.RulesDir != "" {
+		t.Errorf("unexpected defaults: %+v", c)
+	}
+}
+
+func TestFromEnvOverrides(t *testing.T) {
+	c, err := FromEnv(env(map[string]string{
+		"NABU_ADDR": "127.0.0.1:9000", "NABU_RULES_DIR": "/rules", "NABU_LOG_LEVEL": "debug",
+		"NABU_LOG_FORMAT": "text", "NABU_MAX_TEXT_RUNES": "10", "NABU_REQUEST_TIMEOUT": "2s",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := Config{Addr: "127.0.0.1:9000", RulesDir: "/rules", LogLevel: slog.LevelDebug,
+		LogFormat: "text", MaxTextRunes: 10, RequestTimeout: 2 * time.Second}
+	if c != want {
+		t.Errorf("got %+v, want %+v", c, want)
+	}
+}
+
+func TestFromEnvErrors(t *testing.T) {
+	for _, kv := range [][2]string{
+		{"NABU_LOG_LEVEL", "loud"},
+		{"NABU_LOG_FORMAT", "xml"},
+		{"NABU_MAX_TEXT_RUNES", "0"},
+		{"NABU_MAX_TEXT_RUNES", "many"},
+		{"NABU_REQUEST_TIMEOUT", "soon"},
+	} {
+		if _, err := FromEnv(env(map[string]string{kv[0]: kv[1]})); err == nil {
+			t.Errorf("%s=%q: expected error", kv[0], kv[1])
+		}
+	}
+}

@@ -1,0 +1,26 @@
+# Synthetic fixture: NOT linguistic data. Outputs are arbitrary tags chosen
+# so tests can tell every Egyptological transliteration character apart from
+# its ASCII base letter.
+id: test-graphemes
+language: egy
+name: Test fixture — grapheme segmentation
+reference: none (test fixture)
+version: "1"
+graphemes:
+  - { match: "ꜣ", ipa: "<3>" }
+  - { match: "ꜥ", ipa: "<c>" }
+  - { match: "ḥ", ipa: "<H>" }
+  - { match: "ḫ", ipa: "<x>" }
+  - { match: "ẖ", ipa: "<X>" }
+  - { match: "š", ipa: "<S>" }
+  - { match: "ṯ", ipa: "<T>" }
+  - { match: "ḏ", ipa: "<D>" }
+  - { match: "q", ipa: "<q>" }
+  - { match: "ḳ", ipa: "<K>" }
+  - { match: "h", ipa: "h" }
+  - { match: "s", ipa: "s" }
+  - { match: "t", ipa: "t" }
+  - { match: "d", ipa: "d" }
+  - { match: "k", ipa: "k" }
+  - { match: "n", ipa: "n" }
+  - { match: "-", ipa: "" }

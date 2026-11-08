@@ -1,0 +1,17 @@
+[project]
+name = "nabu-data"
+version = "0.0.0"
+description = "Corpus download and cleaning scripts (stub)."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+nabu-data-oracc = "nabu_data.oracc:main"
+nabu-data-cdli = "nabu_data.cdli:main"
+nabu-data-tla = "nabu_data.tla:main"
+
+[build-system]
+requires = ["uv_build>=0.9.5,<0.10"]
+build-backend = "uv_build"
