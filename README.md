@@ -91,6 +91,9 @@ There are **no non-commercial (NC) models or weights** anywhere in the project.
 | Vector store        | PostgreSQL + pgvector                           | PostgreSQL     |
 | HTTP router         | chi                                             | MIT            |
 | Training            | PyTorch, PEFT, TRL                              | BSD-3, Apache-2.0, Apache-2.0 |
+| TTS model code      | VITS, adapted from jaywalnut310/vits            | MIT            |
+| TTS training labels | Epitran (orthography → IPA; no espeak-ng)       | MIT            |
+| Experiment tracking | MLflow (`mlflow-skinny`)                        | Apache-2.0     |
 | TTS training audio  | Mozilla Common Voice                            | CC0            |
 | Web demo            | React, Vite, TypeScript                         | MIT, MIT, Apache-2.0 |
 | Fonts               | Noto Sans Egyptian Hieroglyphs, Noto Sans Cuneiform | OFL-1.1    |
@@ -120,6 +123,7 @@ nabu/
 ├── data/                Go download/cleaning tools (no raw data committed)
 ├── eval/                Go metrics + held-out test sets
 ├── translate/train/     Python LoRA fine-tuning
+├── tts/                 Go TTS runtime (ONNX Runtime) + CLI (nabu-tts) + symbols.txt
 ├── tts/train/           Python VITS training + ONNX export
 └── web/                 React demo
 ```
@@ -128,7 +132,8 @@ nabu/
 
 > [!WARNING]
 > Nabu is in early development. Interfaces, rule files and output formats will
-> change without notice. Only the G2P stage is usable today.
+> change without notice. G2P works; the speech pipeline runs end to end, but no
+> real voice has been trained yet (only a synthetic smoke-test model).
 
 Requires Go.
 
@@ -139,6 +144,17 @@ cd nabu
 # Transliteration → IPA, using the egy-allen reconstruction
 go run ./g2p/cmd/nabu-g2p --rules g2p/rules/egy-allen.yaml "ꜥnḫ"
 ```
+
+Speech pipeline smoke test (also needs [uv](https://docs.astral.sh/uv/) and a C
+compiler for cgo; trains a throwaway model on synthetic tones in a few minutes on CPU):
+
+```sh
+make py-train tts-smoke ort
+NABU_TTS_MODEL=runs/smoke/model.onnx make run-api
+curl -X POST localhost:8080/v1/speak -d '{"text":"ꜥnḫ","ruleset":"egy-allen"}' -o out.wav
+```
+
+See [tts/train/README.md](tts/train/README.md) for real training data and GPU training.
 
 ## How we validate
 

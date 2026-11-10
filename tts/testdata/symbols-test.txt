@@ -1,0 +1,7 @@
+# Small fixed symbol table for the cross-language hash and parser tests.
+# Never edit: tts/testdata/symbols-test.sha256 pins its hash.
+<pad>
+<space>  # word boundary
+a
+U+0303  # combining tilde
+ɡ g  # alias

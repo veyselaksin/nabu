@@ -2,13 +2,17 @@
 package server
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"sort"
+	"strconv"
 	"time"
 	"unicode/utf8"
 
@@ -16,15 +20,24 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/veyselaksin/nabu/g2p"
+	"github.com/veyselaksin/nabu/tts"
 )
 
 const maxBodyBytes = 64 << 10
+
+// Synthesizer turns IPA into audio. *tts.Model implements it.
+type Synthesizer interface {
+	Synthesize(ctx context.Context, ipa string, p tts.Params) (*tts.Audio, error)
+	Info() tts.Info
+}
 
 // Options configures a Server.
 type Options struct {
 	Logger         *slog.Logger
 	MaxTextRunes   int
 	RequestTimeout time.Duration
+	// Synthesizer enables POST /v1/speak. If nil, /v1/speak returns 503.
+	Synthesizer Synthesizer
 }
 
 // Server serves the Nabu API over a fixed set of rule sets.
@@ -73,7 +86,8 @@ func (s *Server) Handler() http.Handler {
 		r.Get("/rulesets", s.listRulesets)
 		r.Post("/g2p", s.g2p)
 		r.Post("/translate", s.notImplemented("translation is not implemented yet"))
-		r.Post("/speak", s.notImplemented("speech synthesis is not implemented yet"))
+		r.Post("/speak", s.speak)
+		r.Get("/voices", s.voices)
 	})
 	r.NotFound(func(w http.ResponseWriter, _ *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", "no such endpoint", nil)
@@ -116,23 +130,33 @@ func (s *Server) g2p(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	if req.Ruleset == "" {
-		writeError(w, http.StatusBadRequest, "invalid_request", "ruleset is required", nil)
-		return
-	}
-	rs, ok := s.rulesets[req.Ruleset]
+	rs, ipa, ok := s.toIPA(w, r, req.Text, req.Ruleset)
 	if !ok {
-		writeError(w, http.StatusBadRequest, "unknown_ruleset",
-			fmt.Sprintf("unknown ruleset %q; see GET /v1/rulesets", req.Ruleset), nil)
 		return
 	}
-	if n := utf8.RuneCountInString(req.Text); n > s.opts.MaxTextRunes {
+	writeJSON(w, http.StatusOK, g2pResponse{IPA: ipa, Ruleset: rs.ID, Reference: rs.Reference})
+}
+
+// toIPA validates the ruleset and text and runs G2P, writing an error
+// response and returning ok=false on failure.
+func (s *Server) toIPA(w http.ResponseWriter, r *http.Request, text, ruleset string) (rs *g2p.RuleSet, ipa string, ok bool) {
+	if ruleset == "" {
+		writeError(w, http.StatusBadRequest, "invalid_request", "ruleset is required", nil)
+		return nil, "", false
+	}
+	rs, found := s.rulesets[ruleset]
+	if !found {
+		writeError(w, http.StatusBadRequest, "unknown_ruleset",
+			fmt.Sprintf("unknown ruleset %q; see GET /v1/rulesets", ruleset), nil)
+		return nil, "", false
+	}
+	if n := utf8.RuneCountInString(text); n > s.opts.MaxTextRunes {
 		writeError(w, http.StatusRequestEntityTooLarge, "text_too_long",
 			fmt.Sprintf("text has %d characters; the limit is %d", n, s.opts.MaxTextRunes), nil)
-		return
+		return nil, "", false
 	}
 
-	ipa, err := rs.ToIPA(req.Text)
+	ipa, err := rs.ToIPA(text)
 	var unknown *g2p.UnknownGraphemeError
 	var badUTF8 *g2p.InvalidUTF8Error
 	switch {
@@ -141,16 +165,145 @@ func (s *Server) g2p(w http.ResponseWriter, r *http.Request) {
 			"grapheme": unknown.Grapheme,
 			"offset":   unknown.Offset,
 		})
-		return
+		return nil, "", false
 	case errors.As(err, &badUTF8):
 		writeError(w, http.StatusBadRequest, "invalid_utf8", "text is not valid UTF-8", nil)
-		return
+		return nil, "", false
 	case err != nil:
 		s.log.ErrorContext(r.Context(), "g2p failed", "err", err, "ruleset", rs.ID)
 		writeError(w, http.StatusInternalServerError, "internal", "internal error", nil)
+		return nil, "", false
+	}
+	return rs, ipa, true
+}
+
+type speakRequest struct {
+	Text    string   `json:"text"`
+	Ruleset string   `json:"ruleset"`
+	Speaker *int     `json:"speaker"`
+	Speed   *float64 `json:"speed"`
+}
+
+// Response headers of POST /v1/speak. Values that may contain non-ASCII text
+// are percent-encoded UTF-8 (decode with decodeURIComponent).
+const (
+	headerIPA            = "X-Nabu-IPA"
+	headerRuleset        = "X-Nabu-Ruleset"
+	headerRulesetVersion = "X-Nabu-Ruleset-Version"
+	headerReference      = "X-Nabu-Reference"
+	headerModel          = "X-Nabu-Model"
+	headerSpeaker        = "X-Nabu-Speaker"
+)
+
+var exposedHeaders = headerIPA + ", " + headerRuleset + ", " + headerRulesetVersion + ", " +
+	headerReference + ", " + headerModel + ", " + headerSpeaker
+
+const ttsUnavailable = "speech synthesis is not configured on this server: set NABU_TTS_MODEL " +
+	"to a model exported with nabu-tts-export (see tts/train/README.md)"
+
+func (s *Server) speak(w http.ResponseWriter, r *http.Request) {
+	if s.opts.Synthesizer == nil {
+		writeError(w, http.StatusServiceUnavailable, "tts_unavailable", ttsUnavailable, nil)
 		return
 	}
-	writeJSON(w, http.StatusOK, g2pResponse{IPA: ipa, Ruleset: rs.ID, Reference: rs.Reference})
+	var req speakRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	params := tts.Params{}
+	if req.Speaker != nil {
+		params.Speaker = *req.Speaker
+	}
+	if req.Speed != nil {
+		if *req.Speed == 0 {
+			writeError(w, http.StatusBadRequest, "invalid_request",
+				fmt.Sprintf("speed must be between %g and %g", tts.MinSpeed, tts.MaxSpeed), nil)
+			return
+		}
+		params.Speed = *req.Speed
+	}
+	rs, ipa, ok := s.toIPA(w, r, req.Text, req.Ruleset)
+	if !ok {
+		return
+	}
+
+	audio, err := s.opts.Synthesizer.Synthesize(r.Context(), ipa, params)
+	var unknown *tts.UnknownSymbolError
+	switch {
+	case errors.As(err, &unknown):
+		writeError(w, http.StatusUnprocessableEntity, "unknown_ipa_symbol",
+			fmt.Sprintf("the voice model cannot pronounce IPA symbol %q (U+%04X) produced by ruleset %s",
+				string(unknown.Symbol), unknown.Symbol, rs.ID),
+			map[string]any{"symbol": string(unknown.Symbol), "offset": unknown.Offset, "ipa": ipa})
+		return
+	case errors.Is(err, tts.ErrEmptyInput):
+		writeError(w, http.StatusUnprocessableEntity, "nothing_to_speak",
+			"the text converts to empty IPA; there is nothing to speak", map[string]any{"ipa": ipa})
+		return
+	case errors.Is(err, tts.ErrInvalidParams):
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error(), nil)
+		return
+	case errors.Is(err, tts.ErrTooLong):
+		writeError(w, http.StatusRequestEntityTooLarge, "text_too_long", err.Error(), nil)
+		return
+	case err != nil && r.Context().Err() != nil:
+		writeError(w, http.StatusGatewayTimeout, "timeout", "speech synthesis took too long", nil)
+		return
+	case err != nil:
+		s.log.ErrorContext(r.Context(), "tts failed", "err", err, "ruleset", rs.ID)
+		writeError(w, http.StatusInternalServerError, "internal", "internal error", nil)
+		return
+	}
+
+	var buf bytes.Buffer
+	if err := tts.EncodeWAV(&buf, audio.Samples, audio.SampleRate); err != nil {
+		s.log.ErrorContext(r.Context(), "wav encoding failed", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal", "internal error", nil)
+		return
+	}
+	h := w.Header()
+	h.Set("Content-Type", "audio/wav")
+	h.Set("Content-Length", strconv.Itoa(buf.Len()))
+	h.Set("Cache-Control", "no-store")
+	h.Set("X-Content-Type-Options", "nosniff")
+	h.Set(headerIPA, url.PathEscape(ipa))
+	h.Set(headerRuleset, rs.ID)
+	h.Set(headerRulesetVersion, url.PathEscape(rs.Version))
+	h.Set(headerReference, url.PathEscape(rs.Reference))
+	h.Set(headerModel, url.PathEscape(s.opts.Synthesizer.Info().Name))
+	h.Set(headerSpeaker, strconv.Itoa(params.Speaker))
+	h.Set("Access-Control-Expose-Headers", exposedHeaders)
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(buf.Bytes())
+}
+
+type voicesResponse struct {
+	Available bool        `json:"available"`
+	Message   string      `json:"message,omitempty"`
+	Model     *voiceModel `json:"model,omitempty"`
+}
+
+type voiceModel struct {
+	Name       string   `json:"name"`
+	SampleRate int      `json:"sample_rate"`
+	Languages  []string `json:"languages"`
+	Speakers   []string `json:"speakers"`
+	MinSpeed   float64  `json:"min_speed"`
+	MaxSpeed   float64  `json:"max_speed"`
+}
+
+// voices reports whether /v1/speak is available and which speakers it has.
+// Speaker labels are pseudonymous (hashed Common Voice ids).
+func (s *Server) voices(w http.ResponseWriter, _ *http.Request) {
+	if s.opts.Synthesizer == nil {
+		writeJSON(w, http.StatusOK, voicesResponse{Available: false, Message: ttsUnavailable})
+		return
+	}
+	info := s.opts.Synthesizer.Info()
+	writeJSON(w, http.StatusOK, voicesResponse{Available: true, Model: &voiceModel{
+		Name: info.Name, SampleRate: info.SampleRate, Languages: info.Languages, Speakers: info.Speakers,
+		MinSpeed: tts.MinSpeed, MaxSpeed: tts.MaxSpeed,
+	}})
 }
 
 func (s *Server) notImplemented(msg string) http.HandlerFunc {

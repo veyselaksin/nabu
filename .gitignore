@@ -19,6 +19,25 @@ __pycache__/
 *.conllu
 *.atf
 
+# TTS: never commit audio, model weights or training runs.
+/runs/
+/.ort/
+*.onnx
+*.onnx.data
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.wav
+*.mp3
+*.flac
+*.ogg
+mlflow.db
+mlruns/
+# Synthesized evaluation samples (listen locally; only the input list is tracked).
+/eval/samples/*
+!/eval/samples/README.md
+
 # Local env / editors / OS
 .env
 .env.*

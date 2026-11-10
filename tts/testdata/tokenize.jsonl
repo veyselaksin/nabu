@@ -1,0 +1,20 @@
+{"comment": "Shared tokenizer vectors for tts/symbols.txt (Go: package tts; Python: nabu_tts.symbols). Ids are stable because the table is append-only."}
+{"input": "ʕnχ", "add_blank": false, "ids": [76, 47, 73]}
+{"input": "ʕnχ ħtp", "add_blank": false, "ids": [76, 47, 73, 1, 75, 34, 32]}
+{"input": "ʕnχ ħtp", "add_blank": true, "ids": [0, 76, 0, 47, 0, 73, 0, 1, 0, 75, 0, 34, 0, 32, 0]}
+{"input": "  nfr\t\n ħtp  ", "add_blank": false, "ids": [47, 60, 53, 1, 75, 34, 32]}
+{"input": "n f r", "add_blank": false, "ids": [47, 1, 60, 1, 53]}
+{"input": "n\u001ff", "add_blank": false, "ids": [47, 1, 60]}
+{"input": "ã", "add_blank": false, "ids": [26, 145]}
+{"input": "ã", "add_blank": false, "ids": [26, 145]}
+{"input": "ɡ g", "add_blank": false, "ids": [41, 1, 41]}
+{"input": "tʃʰ", "add_blank": false, "ids": [34, 66, 112]}
+{"input": "ˈpa.ta", "add_blank": false, "ids": [152, 32, 26, 156, 34, 26]}
+{"input": "ç", "add_blank": false, "ids": [38, 150]}
+{"input": "", "add_blank": false, "ids": []}
+{"input": "", "add_blank": true, "ids": [0]}
+{"input": "nfr", "add_blank": true, "ids": [0, 47, 0, 60, 0, 53, 0]}
+{"input": "nAr", "add_blank": false, "error": {"symbol": "U+0041", "offset": 1}}
+{"input": "ʕn ʧ", "add_blank": false, "error": {"symbol": "U+02A7", "offset": 3}}
+{"input": "abc😀", "add_blank": false, "error": {"symbol": "U+1F600", "offset": 3}}
+{"input": "ç̱", "add_blank": false, "error": {"symbol": "U+0331", "offset": 2}}

@@ -1,15 +1,30 @@
 import { useEffect, useId, useState, type FormEvent } from "react";
-import { ApiError, listRulesets, toIPA, type G2PResult, type RulesetInfo } from "./api";
+import {
+  ApiError,
+  listRulesets,
+  speak,
+  toIPA,
+  voices,
+  type G2PResult,
+  type RulesetInfo,
+  type SpeakResult,
+  type VoicesInfo,
+} from "./api";
 
-// TODO: replace with the exact reconstruction disclaimer from README.md.
-// README.md did not exist when this page was scaffolded, so this is interim text.
+// Mirrors the [!IMPORTANT] callout in README.md, plus what is specific to the voice.
 const DISCLAIMER =
-  "Nabu's pronunciations are scholarly reconstructions, not recordings. Nobody knows exactly how " +
-  "these languages sounded. Each output follows one published reconstruction (named and cited " +
-  "with every result), and other scholars may disagree with it. The rule sets shipped right now " +
+  "Nobody knows exactly how these languages sounded, and there are no recordings. Everything " +
+  "Nabu outputs follows a published scholarly reconstruction, named and cited with every result; " +
+  "other scholars reconstruct these languages differently. The voice was trained on recordings " +
+  "of modern languages, so it reads the reconstructed IPA with a modern speaker's voice and accent. " +
+  "This is an educational and research tool, not ground truth. The rule sets shipped right now " +
   "are placeholders for testing and are not yet sourced from their references.";
 
 const EXAMPLE = "ꜥnḫ";
+
+interface Spoken extends SpeakResult {
+  url: string;
+}
 
 export function App() {
   const ids = { text: useId(), ruleset: useId(), speakHint: useId() };
@@ -17,8 +32,10 @@ export function App() {
   const [ruleset, setRuleset] = useState("");
   const [text, setText] = useState(EXAMPLE);
   const [result, setResult] = useState<G2PResult | null>(null);
+  const [spoken, setSpoken] = useState<Spoken | null>(null);
+  const [voice, setVoice] = useState<VoicesInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<"convert" | "speak" | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -29,14 +46,24 @@ export function App() {
         setRuleset((current) => current || list[0]?.id || "");
       })
       .catch((e: unknown) => !cancelled && setError(message(e)));
+    voices()
+      .then((v) => !cancelled && setVoice(v))
+      .catch(() => !cancelled && setVoice({ available: false, message: "Could not query /v1/voices." }));
     return () => {
       cancelled = true;
     };
   }, []);
 
+  // Release the previous audio blob whenever a new one replaces it (and on unmount).
+  useEffect(() => {
+    return () => {
+      if (spoken) URL.revokeObjectURL(spoken.url);
+    };
+  }, [spoken]);
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    setBusy(true);
+    setBusy("convert");
     setError(null);
     try {
       setResult(await toIPA(text, ruleset));
@@ -44,11 +71,31 @@ export function App() {
       setResult(null);
       setError(message(err));
     } finally {
-      setBusy(false);
+      setBusy(null);
+    }
+  }
+
+  async function onSpeak() {
+    setBusy("speak");
+    setError(null);
+    try {
+      const r = await speak(text, ruleset);
+      setSpoken({ ...r, url: URL.createObjectURL(r.audio) });
+      setResult({ ipa: r.ipa, ruleset: r.ruleset, reference: r.reference });
+    } catch (err) {
+      setSpoken(null);
+      setError(message(err));
+    } finally {
+      setBusy(null);
     }
   }
 
   const selected = rulesets.find((r) => r.id === ruleset);
+  const canSubmit = busy === null && ruleset !== "" && text.trim() !== "";
+  const speakAvailable = voice?.available === true;
+  const speakHint = speakAvailable
+    ? "Synthesize speech from the reconstructed IPA"
+    : (voice?.message ?? "Checking whether speech synthesis is available…");
 
   return (
     <main>
@@ -57,7 +104,9 @@ export function App() {
       </aside>
 
       <h1>Nabu</h1>
-      <p className="lede">Convert a transliteration to IPA using a published pronunciation reconstruction.</p>
+      <p className="lede">
+        Convert a transliteration to IPA using a published pronunciation reconstruction, and hear it spoken.
+      </p>
 
       <form onSubmit={onSubmit}>
         <label htmlFor={ids.text}>Transliteration</label>
@@ -88,19 +137,25 @@ export function App() {
         {selected && <p className="reference">Source: {selected.reference}</p>}
 
         <div className="actions">
-          <button type="submit" disabled={busy || !ruleset || text.trim() === ""}>
-            {busy ? "Converting…" : "Convert to IPA"}
+          <button type="submit" disabled={!canSubmit}>
+            {busy === "convert" ? "Converting…" : "Convert to IPA"}
           </button>
           {/* Disabled buttons don't fire hover events, so the tooltip sits on a wrapper. */}
-          <span className="tooltip" data-tooltip="Coming soon">
-            <button type="button" disabled aria-describedby={ids.speakHint}>
-              Speak
+          <span className="tooltip" data-tooltip={speakAvailable ? undefined : "Speech unavailable"}>
+            <button
+              type="button"
+              onClick={onSpeak}
+              disabled={!canSubmit || !speakAvailable}
+              aria-describedby={ids.speakHint}
+            >
+              {busy === "speak" ? "Speaking…" : "Speak"}
             </button>
           </span>
           <span id={ids.speakHint} className="visually-hidden">
-            Speech synthesis is coming soon.
+            {speakHint}
           </span>
         </div>
+        {voice && !speakAvailable && <p className="muted small">{speakHint}</p>}
       </form>
 
       <section aria-live="polite" className="output">
@@ -114,7 +169,24 @@ export function App() {
             </p>
           </>
         )}
-        {!result && !error && <p className="muted">Enter a transliteration and press Convert.</p>}
+        {spoken && !error && (
+          <figure className="player">
+            <audio controls autoPlay src={spoken.url}>
+              Your browser cannot play WAV audio.
+            </audio>
+            <figcaption>
+              <span className="ipa small-ipa">/{spoken.ipa}/</span>
+              <span className="reference">
+                Reconstruction: {spoken.ruleset} v{spoken.rulesetVersion}: {spoken.reference}
+              </span>
+              <span className="reference">
+                Voice: {spoken.model}, speaker {spoken.speaker}. Modern-language voice reading reconstructed IPA,
+                not a recording.
+              </span>
+            </figcaption>
+          </figure>
+        )}
+        {!result && !error && <p className="muted">Enter a transliteration and press Convert or Speak.</p>}
       </section>
     </main>
   );

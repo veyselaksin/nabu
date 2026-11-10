@@ -16,6 +16,8 @@ used for.
 | CDLI: Cuneiform Digital Library Initiative (Sumerian) | https://cdli.mpiwg-berlin.mpg.de/ | TODO(source): verify | TODO(source): verify | Catalogue data, transliterations and images may be licensed separately. |
 | TLA: Thesaurus Linguae Aegyptiae (Middle Egyptian) | https://thesaurus-linguae-aegyptiae.de/ | TODO(source): verify | TODO(source): verify | Identify the canonical bulk export and its license. |
 | Hittite source | (none chosen) | — | — | TODO(source): identify a Hittite corpus with usable terms. |
+| Mozilla Common Voice (TTS training audio) | https://commonvoice.mozilla.org/ | CC0-1.0 | No | Speech recordings, not downloaded by Nabu: get each locale from Mozilla, accepting its terms, which include not trying to identify speakers. `tts/train` hashes speaker ids. TODO(source): record the release version(s) used for each published model in its model card. |
+| Epitran map tables (TTS labels) | https://github.com/dmort27/epitran | MIT | No | Orthography → IPA rules, installed as a Python dependency, not data we ship. |
 
 ## Policy
 

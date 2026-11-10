@@ -1,0 +1,10 @@
+# Fixed inputs for listening tests: id<TAB>ruleset<TAB>transliteration.
+# Synthesize with: make tts-samples MODEL=path/to/model.onnx [LABEL=step-N]
+# Keep this list stable so checkpoints stay comparable. These inputs are the
+# g2p golden-test words; while egy-allen is a PLACEHOLDER rule file, their
+# IPA is a toy value, not a pronunciation.
+egy-01	egy-allen	ꜥnḫ
+egy-02	egy-allen	ḥtp
+egy-03	egy-allen	nfr
+egy-04	egy-allen	ꜥnḫ.t
+egy-05	egy-allen	ꜥnḫ ḥtp

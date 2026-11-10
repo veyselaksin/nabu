@@ -9,13 +9,23 @@ dependencies = ["nabu-translate", "nabu-tts", "nabu-eval", "nabu-data"]
 package = false
 
 [tool.uv.workspace]
-members = ["translate", "tts", "eval", "data"]
+members = ["translate", "tts/train", "eval", "data"]
 
 [tool.uv.sources]
 nabu-translate = { workspace = true }
 nabu-tts = { workspace = true }
 nabu-eval = { workspace = true }
 nabu-data = { workspace = true }
+# Linux: use PyTorch's CPU-only wheels by default. The default PyPI Linux wheels
+# pull in NVIDIA CUDA libraries, which are under NVIDIA's proprietary license,
+# not an OSI license. GPU training installs a CUDA build explicitly; see
+# tts/train/README.md ("GPU training and licenses").
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [dependency-groups]
 dev = ["pytest>=8", "ruff>=0.6"]
@@ -23,7 +33,7 @@ dev = ["pytest>=8", "ruff>=0.6"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-extend-exclude = ["web", "g2p", "api"]
+extend-exclude = ["web", "g2p", "api", "runs"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "ANN"]
@@ -34,7 +44,9 @@ known-first-party = ["nabu_translate", "nabu_tts", "nabu_eval", "nabu_data"]
 
 [tool.ruff.lint.per-file-ignores]
 "*/tests/*" = ["ANN"]
+# Adapted from jaywalnut310/vits (MIT): upstream style and quirks are kept.
+"tts/train/src/nabu_tts/vits/*" = ["ANN", "E501", "E712", "E741", "F811", "F841", "B", "N", "RUF", "SIM"]
 
 [tool.pytest.ini_options]
-testpaths = ["translate/tests", "tts/tests", "eval/tests", "data/tests"]
+testpaths = ["translate/tests", "tts/train/tests", "eval/tests", "data/tests"]
 addopts = ["--import-mode=importlib", "-ra"]

@@ -25,6 +25,15 @@ type Config struct {
 	MaxTextRunes int
 	// RequestTimeout bounds handler run time. Env: NABU_REQUEST_TIMEOUT (default 10s).
 	RequestTimeout time.Duration
+	// TTSModel is an ONNX model exported by nabu-tts-export. If empty, speech
+	// synthesis is disabled and /v1/speak returns 503. Env: NABU_TTS_MODEL.
+	TTSModel string
+	// ORTLibrary is the ONNX Runtime shared library to load (default: the
+	// platform's library name on the loader's search path). Env: NABU_ORT_LIB.
+	ORTLibrary string
+	// TTSThreads limits ONNX Runtime threads per request (0 = ORT default).
+	// Env: NABU_TTS_THREADS.
+	TTSThreads int
 }
 
 // FromEnv builds a Config from getenv (normally os.Getenv).
@@ -32,6 +41,8 @@ func FromEnv(getenv func(string) string) (Config, error) {
 	c := Config{
 		Addr:           ":8080",
 		RulesDir:       strings.TrimSpace(getenv("NABU_RULES_DIR")),
+		TTSModel:       strings.TrimSpace(getenv("NABU_TTS_MODEL")),
+		ORTLibrary:     strings.TrimSpace(getenv("NABU_ORT_LIB")),
 		LogLevel:       slog.LevelInfo,
 		LogFormat:      "json",
 		MaxTextRunes:   2000,
@@ -64,6 +75,13 @@ func FromEnv(getenv func(string) string) (Config, error) {
 			return c, fmt.Errorf("NABU_REQUEST_TIMEOUT: must be a positive duration such as 10s, got %q", v)
 		}
 		c.RequestTimeout = d
+	}
+	if v := getenv("NABU_TTS_THREADS"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 0 {
+			return c, fmt.Errorf("NABU_TTS_THREADS: must be a non-negative integer, got %q", v)
+		}
+		c.TTSThreads = n
 	}
 	return c, nil
 }

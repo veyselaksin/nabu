@@ -1,15 +1,23 @@
 GO      ?= go
 UV      ?= uv
 NPM     ?= npm
-GO_PKGS := ./g2p/... ./api/...
+GO_PKGS := ./g2p/... ./tts/... ./api/...
+GO_DIRS := g2p tts api
 RULES   ?= g2p/rules/egy-allen.yaml
+# ONNX Runtime shared library for the Go TTS runtime. Recipes that need it
+# fetch it on demand (scripts/fetch-ort.sh prints the path); set NABU_ORT_LIB
+# to use your own copy of ONNX Runtime 1.31.0.
+ORT_LIB = $${NABU_ORT_LIB:-$$(scripts/fetch-ort.sh .ort)}
+MODEL   ?= runs/smoke/model.onnx
+LABEL   ?=
 
 .DEFAULT_GOAL := help
 .PHONY: help test test-go test-py lint lint-go lint-py lint-web fmt build-web \
-        run-api run-web g2p wasm licenses golden clean
+        run-api run-web g2p wasm licenses golden clean ort py-train \
+        tts-smoke tts-smoke-data tts-smoke-train tts-export tts-samples test-tts-integration
 
 help: ## Show this help
-	@awk 'BEGIN{FS=":.*## "} /^[a-z-]+:.*## /{printf "  %-10s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN{FS=":.*## "} /^[a-z-]+:.*## /{printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 test: test-go test-py ## Run Go and Python tests
 
@@ -22,7 +30,7 @@ test-py:
 lint: lint-go lint-py lint-web ## gofmt + go vet + WASM build, ruff, tsc
 
 lint-go: wasm
-	@out=$$(gofmt -l g2p api); if [ -n "$$out" ]; then echo "gofmt needed:"; echo "$$out"; exit 1; fi
+	@out=$$(gofmt -l $(GO_DIRS)); if [ -n "$$out" ]; then echo "gofmt needed:"; echo "$$out"; exit 1; fi
 	$(GO) vet $(GO_PKGS)
 
 lint-py:
@@ -33,7 +41,7 @@ lint-web: web/node_modules
 	cd web && $(NPM) run typecheck
 
 fmt: ## Format Go and Python code
-	gofmt -w g2p api
+	gofmt -w $(GO_DIRS)
 	$(UV) run ruff format .
 	$(UV) run ruff check --fix .
 
@@ -43,8 +51,9 @@ wasm: ## Check that the g2p package builds for GOOS=js GOARCH=wasm
 build-web: web/node_modules ## Production build of the web demo
 	cd web && $(NPM) run build
 
-run-api: ## Run the API on :8080 (env: NABU_ADDR, NABU_RULES_DIR, NABU_LOG_LEVEL, ...)
-	$(GO) run ./api/cmd/nabu-api
+run-api: ## Run the API on :8080 (env: NABU_TTS_MODEL enables /v1/speak; NABU_ADDR, ...)
+	NABU_ORT_LIB=$${NABU_ORT_LIB:-$(abspath $(firstword $(wildcard .ort/lib/libonnxruntime*)))} \
+	  $(GO) run ./api/cmd/nabu-api
 
 run-web: web/node_modules ## Run the web demo on :5173 (proxies /v1 to :8080)
 	cd web && $(NPM) run dev
@@ -61,6 +70,31 @@ licenses: web/node_modules ## Check npm dependency licenses against the allowlis
 web/node_modules: web/package-lock.json
 	cd web && $(NPM) ci
 	@touch web/node_modules
+
+ort: ## Download the pinned ONNX Runtime library (MIT, checksum-verified) into .ort/
+	scripts/fetch-ort.sh .ort
+
+py-train: ## Install the Python training extras (torch, epitran, mlflow, onnx, ...)
+	$(UV) sync --all-packages --all-extras
+
+tts-smoke: tts-smoke-data tts-smoke-train tts-export ## CPU smoke run: synthetic data → train → ONNX (minutes)
+
+tts-smoke-data:
+	$(UV) run nabu-tts-smoke-data --out runs/smoke-data
+
+tts-smoke-train:
+	$(UV) run nabu-tts-train --config tts/train/configs/smoke.yaml
+
+tts-export: ## Export runs/smoke (or CKPT=..., MODEL=...) to ONNX with a parity check
+	$(UV) run nabu-tts-export --checkpoint $${CKPT:-runs/smoke/checkpoints/latest.pt} --out $(MODEL)
+
+tts-samples: ## Render eval/testsets/tts-samples.tsv with MODEL into eval/samples/[LABEL]
+	$(GO) run ./tts/cmd/nabu-tts --model $(MODEL) --ort-lib "$(ORT_LIB)" \
+	  --samples eval/testsets/tts-samples.tsv --out-dir eval/samples $(if $(LABEL),--label $(LABEL))
+
+test-tts-integration: ## Go integration tests against MODEL (default runs/smoke/model.onnx)
+	lib="$(ORT_LIB)" && NABU_TTS_MODEL=$(abspath $(MODEL)) NABU_ORT_LIB="$$(cd "$$(dirname "$$lib")" && pwd)/$$(basename "$$lib")" \
+	  $(GO) test -count=1 -run Integration -v ./tts/
 
 clean:
 	rm -rf bin web/dist

@@ -1,0 +1,41 @@
+[project]
+name = "nabu-tts"
+version = "0.1.0"
+description = "Offline training, data preparation and ONNX export for Nabu's IPA-input VITS model."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.11"
+# Base install: symbol table, tokenizer and rule-file helpers only, so the
+# workspace's default `uv sync` (and CI) stays light. Heavy pieces are extras.
+dependencies = ["numpy>=2.0", "pyyaml>=6.0"]
+
+[project.optional-dependencies]
+# Common Voice → manifest pipeline and the coverage report.
+data = [
+  "epitran>=1.35",     # MIT (orthography → IPA)
+  "miniaudio>=1.61",   # MIT (bundles miniaudio + stb_vorbis, MIT). No ffmpeg, no libsndfile.
+  "scipy>=1.14",       # BSD-3 (resampling)
+]
+# Training, export and the ONNX parity check.
+train = [
+  "torch>=2.6",        # BSD-3
+  "numba>=0.61",       # BSD-2 (monotonic alignment search)
+  "scipy>=1.14",       # BSD-3
+  "mlflow-skinny>=3.0",# Apache-2.0. Tracking client only: full `mlflow` pulls in matplotlib (PSF-style license).
+  "sqlalchemy>=2.0",   # MIT; needed by mlflow-skinny for the sqlite tracking store
+  "alembic>=1.13",     # MIT; ditto
+  "onnx>=1.17",        # Apache-2.0
+  "onnxruntime>=1.20", # MIT
+  "onnxscript>=0.2",   # MIT; required by torch.onnx at import time in recent torch
+]
+
+[project.scripts]
+nabu-tts-coverage = "nabu_tts.coverage:main"
+nabu-tts-prepare = "nabu_tts.prepare:main"
+nabu-tts-smoke-data = "nabu_tts.smoke_data:main"
+nabu-tts-train = "nabu_tts.train:main"
+nabu-tts-export = "nabu_tts.export:main"
+
+[build-system]
+requires = ["uv_build>=0.9.5,<0.10"]
+build-backend = "uv_build"

@@ -3,4 +3,7 @@
 !go.work.sum
 !g2p/
 !api/
+!tts/
+tts/train/
+!scripts/fetch-ort.sh
 **/testdata/golden/*.orig

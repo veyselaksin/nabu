@@ -1,0 +1,224 @@
+# Nabu TTS input symbol table. Shared by the Python trainer (tts/train) and
+# the Go runtime (package tts), which embeds this file.
+#
+# Format
+#   One entry per line. The token id of an entry is its index among
+#   non-comment lines, starting at 0. A line is whitespace-separated fields:
+#     <symbol> [<alias> ...] [# comment]
+#   Aliases are tokenized to the same id as the symbol. A field is either a
+#   single code point written literally, a code point written as U+XXXX, or
+#   one of the special names <pad> and <space>. Lines starting with # are
+#   comments; a field starting with # starts a trailing comment.
+#
+# Tokenization (implemented identically in Go and Python; see the shared test
+# vectors in tts/testdata/):
+#   1. Normalize the IPA string to Unicode NFD, so diacritics are separate
+#      code points (e.g. U+00E3 becomes a + U+0303).
+#   2. Trim whitespace and collapse each run of whitespace into one <space>.
+#   3. Map every code point to its id. A code point that is not in this table
+#      is an error. Nothing is ever dropped.
+#   4. If the model uses add_blank, insert <pad> between all tokens and at
+#      both ends (VITS convention).
+#
+# Rules for editing
+#   * APPEND ONLY. Never reorder, delete or change existing lines: token ids
+#     are baked into every trained model. Models record a hash of this table
+#     and the runtime refuses to load a model trained on a different table.
+#   * Adding entries changes the hash too, so existing models must be
+#     retrained (or re-exported after resizing the embedding) to use it.
+#   * This is the IPA character set, not a claim about any language's
+#     phoneme inventory.
+
+# --- special tokens
+<pad>  # id 0: padding, and the blank token for add_blank
+<space>  # word boundary
+
+# --- vowels (IPA chart)
+i  # latin small letter i
+y  # latin small letter y
+ɨ  # latin small letter i with stroke
+ʉ  # latin small letter u bar
+ɯ  # latin small letter turned m
+u  # latin small letter u
+ɪ  # latin letter small capital i
+ʏ  # latin letter small capital y
+ʊ  # latin small letter upsilon
+e  # latin small letter e
+ø  # latin small letter o with stroke
+ɘ  # latin small letter reversed e
+ɵ  # latin small letter barred o
+ɤ  # latin small letter rams horn
+o  # latin small letter o
+ə  # latin small letter schwa
+ɛ  # latin small letter open e
+œ  # latin small ligature oe
+ɜ  # latin small letter reversed open e
+ɞ  # latin small letter closed reversed open e
+ʌ  # latin small letter turned v
+ɔ  # latin small letter open o
+æ  # latin small letter ae
+ɐ  # latin small letter turned a
+a  # latin small letter a
+ɶ  # latin letter small capital oe
+ɑ  # latin small letter alpha
+ɒ  # latin small letter turned alpha
+ɚ  # latin small letter schwa with hook
+ɝ  # latin small letter reversed open e with hook
+
+# --- pulmonic consonants (IPA chart)
+p  # latin small letter p
+b  # latin small letter b
+t  # latin small letter t
+d  # latin small letter d
+ʈ  # latin small letter t with retroflex hook
+ɖ  # latin small letter d with tail
+c  # latin small letter c
+ɟ  # latin small letter dotless j with stroke
+k  # latin small letter k
+ɡ g  # latin small letter script g
+q  # latin small letter q
+ɢ  # latin letter small capital g
+ʔ  # latin letter glottal stop
+m  # latin small letter m
+ɱ  # latin small letter m with hook
+n  # latin small letter n
+ɳ  # latin small letter n with retroflex hook
+ɲ  # latin small letter n with left hook
+ŋ  # latin small letter eng
+ɴ  # latin letter small capital n
+ʙ  # latin letter small capital b
+r  # latin small letter r
+ʀ  # latin letter small capital r
+ⱱ  # latin small letter v with right hook
+ɾ  # latin small letter r with fishhook
+ɽ  # latin small letter r with tail
+ɸ  # latin small letter phi
+β  # greek small letter beta
+f  # latin small letter f
+v  # latin small letter v
+θ  # greek small letter theta
+ð  # latin small letter eth
+s  # latin small letter s
+z  # latin small letter z
+ʃ  # latin small letter esh
+ʒ  # latin small letter ezh
+ʂ  # latin small letter s with hook
+ʐ  # latin small letter z with retroflex hook
+ʝ  # latin small letter j with crossed-tail
+x  # latin small letter x
+ɣ  # latin small letter gamma
+χ  # greek small letter chi
+ʁ  # latin letter small capital inverted r
+ħ  # latin small letter h with stroke
+ʕ  # latin letter pharyngeal voiced fricative
+h  # latin small letter h
+ɦ  # latin small letter h with hook
+ɬ  # latin small letter l with belt
+ɮ  # latin small letter lezh
+ʋ  # latin small letter v with hook
+ɹ  # latin small letter turned r
+ɻ  # latin small letter turned r with hook
+j  # latin small letter j
+ɰ  # latin small letter turned m with long leg
+l  # latin small letter l
+ɭ  # latin small letter l with retroflex hook
+ʎ  # latin small letter turned y
+ʟ  # latin letter small capital l
+
+# --- non-pulmonic consonants (IPA chart)
+ʘ  # latin letter bilabial click
+ǀ  # latin letter dental click
+ǃ  # latin letter retroflex click
+ǂ  # latin letter alveolar click
+ǁ  # latin letter lateral click
+ɓ  # latin small letter b with hook
+ɗ  # latin small letter d with hook
+ʄ  # latin small letter dotless j with stroke and hook
+ɠ  # latin small letter g with hook
+ʛ  # latin letter small capital g with hook
+
+# --- other symbols (IPA chart)
+ʍ  # latin small letter turned w
+w  # latin small letter w
+ɥ  # latin small letter turned h
+ʜ  # latin letter small capital h
+ʢ  # latin letter reversed glottal stop with stroke
+ʡ  # latin letter glottal stop with stroke
+ɕ  # latin small letter c with curl
+ʑ  # latin small letter z with curl
+ɺ  # latin small letter turned r with long leg
+ɧ  # latin small letter heng with hook
+ɫ  # latin small letter l with middle tilde
+
+# --- modifier letters (IPA chart)
+U+02BC  # ʼ modifier letter apostrophe
+U+02B0  # ʰ modifier letter small h
+U+02B1  # ʱ modifier letter small h with hook
+U+02B7  # ʷ modifier letter small w
+U+02B2  # ʲ modifier letter small j
+U+02E0  # ˠ modifier letter small gamma
+U+02E4  # ˤ modifier letter small reversed glottal stop
+U+207F  # ⁿ superscript latin small letter n
+U+02E1  # ˡ modifier letter small l
+U+02DE  # ˞ modifier letter rhotic hook
+
+# --- combining diacritics (IPA chart)
+U+0325  # ̥ combining ring below
+U+030A  # ̊ combining ring above
+U+032C  # ̬ combining caron below
+U+0339  # ̹ combining right half ring below
+U+031C  # ̜ combining left half ring below
+U+031F  # ̟ combining plus sign below
+U+0320  # ̠ combining minus sign below
+U+0308  # ̈ combining diaeresis
+U+033D  # ̽ combining x above
+U+0329  # ̩ combining vertical line below
+U+030D  # ̍ combining vertical line above
+U+032F  # ̯ combining inverted breve below
+U+0311  # ̑ combining inverted breve
+U+0324  # ̤ combining diaeresis below
+U+0330  # ̰ combining tilde below
+U+033C  # ̼ combining seagull below
+U+0334  # ̴ combining tilde overlay
+U+031D  # ̝ combining up tack below
+U+031E  # ̞ combining down tack below
+U+0318  # ̘ combining left tack below
+U+0319  # ̙ combining right tack below
+U+032A  # ̪ combining bridge below
+U+033A  # ̺ combining inverted bridge below
+U+033B  # ̻ combining square below
+U+0303  # ̃ combining tilde
+U+031A  # ̚ combining left angle above
+U+0361  # ͡ combining double inverted breve
+U+035C  # ͜ combining double breve below
+U+0306  # ̆ combining breve
+U+0327  # ̧ combining cedilla
+U+0328  # ̨ combining ogonek
+
+# --- suprasegmentals (IPA chart)
+U+02C8  # ˈ modifier letter vertical line
+U+02CC  # ˌ modifier letter low vertical line
+U+02D0  # ː modifier letter triangular colon
+U+02D1  # ˑ modifier letter half triangular colon
+.  # full stop
+|  # vertical line
+‖  # double vertical line
+‿  # undertie
+
+# --- tones and word accents (IPA chart)
+U+02E5  # ˥ modifier letter extra-high tone bar
+U+02E6  # ˦ modifier letter high tone bar
+U+02E7  # ˧ modifier letter mid tone bar
+U+02E8  # ˨ modifier letter low tone bar
+U+02E9  # ˩ modifier letter extra-low tone bar
+U+030B  # ̋ combining double acute accent
+U+0301  # ́ combining acute accent
+U+0304  # ̄ combining macron
+U+0300  # ̀ combining grave accent
+U+030F  # ̏ combining double grave accent
+U+030C  # ̌ combining caron
+U+0302  # ̂ combining circumflex accent
+U+A71C  # ꜜ modifier letter raised down arrow
+U+A71B  # ꜛ modifier letter raised up arrow
+↗  # north east arrow
+↘  # south east arrow

@@ -1,0 +1,59 @@
+# Full training on GPU: upstream VITS (vctk_base) model size, multi-speaker,
+# IPA input from tts/symbols.txt. Run from the repository root:
+#
+#   uv run nabu-tts-train --config tts/train/configs/full.yaml
+#
+# Re-running the same command resumes from runs/full/checkpoints/latest.pt.
+run_name: full
+output_dir: runs/full
+data:
+  # TODO(decision): the donor language mix. Choose it from the
+  # nabu-tts-coverage report, prepare each locale with nabu-tts-prepare, and
+  # list the manifests here, e.g. runs/data/<locale>/manifest.jsonl.
+  manifests: []
+  val_size: 100
+  sample_rate: 22050
+  filter_length: 1024
+  hop_length: 256
+  win_length: 1024
+  n_mel_channels: 80
+  mel_fmin: 0.0
+  mel_fmax: null
+  add_blank: true
+  max_tokens: 300
+train:
+  device: cuda
+  max_steps: 800000
+  batch_size: 32
+  learning_rate: 2.0e-4
+  betas: [0.8, 0.99]
+  eps: 1.0e-9
+  lr_decay: 0.999875
+  segment_size: 8192
+  c_mel: 45
+  c_kl: 1.0
+  fp16: true
+  num_workers: 8
+  log_every: 200
+  eval_every: 5000
+  checkpoint_every: 5000
+  keep_checkpoints: 5
+model:
+  inter_channels: 192
+  hidden_channels: 192
+  filter_channels: 768
+  n_heads: 2
+  n_layers: 6
+  kernel_size: 3
+  p_dropout: 0.1
+  resblock: "1"
+  resblock_kernel_sizes: [3, 7, 11]
+  resblock_dilation_sizes: [[1, 3, 5], [1, 3, 5], [1, 3, 5]]
+  upsample_rates: [8, 8, 2, 2]
+  upsample_initial_channel: 512
+  upsample_kernel_sizes: [16, 16, 4, 4]
+  gin_channels: 256
+  use_sdp: true
+mlflow:
+  tracking_uri: sqlite:///runs/mlflow.db
+  experiment: nabu-tts

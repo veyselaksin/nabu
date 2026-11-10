@@ -1,0 +1,44 @@
+# Candidate "phonetic donor" languages: Common Voice locales whose recordings
+# could teach the IPA-input voice how to pronounce the symbols the rule files
+# emit. This is a list of CANDIDATES to measure with nabu-tts-coverage; it is
+# not a choice. The final mix is a project decision.
+#
+# How this list was built (2026-11-08):
+#   * epitran_code: verified to exist in Epitran 1.35.3 (data/map/<code>.csv).
+#     Selection: every Epitran map whose output column can contain at least
+#     one of ʕ ħ χ q, intersected with the locales listed by the Common Voice
+#     languages API. That is a property of Epitran's tables, not a claim about
+#     the languages; measure real coverage on converted data.
+#   * cv_locale: verified to appear in https://commonvoice.mozilla.org/api/v1/languages.
+#     Whether a release has enough validated hours varies; check the release.
+#   * script: ISO 15924 code of the Epitran map. nabu-tts-coverage checks that
+#     Common Voice sentences are actually written in this script.
+#   * abjad: true only where the writing system is an abjad that normally
+#     leaves short vowels unwritten, so orthography → IPA cannot recover them.
+#     See "The unvocalized-script problem" in tts/train/README.md.
+#     TODO(decision): orthographies marked "verify" below need a check by
+#     someone who knows them before they are used as donors.
+#
+# Fields: cv_locale, epitran_code, script, abjad (bool), notes.
+candidates:
+  - { cv_locale: ar,  epitran_code: ara-Arab, script: Arab, abjad: true,  notes: "Abjad; short vowels normally unwritten. See vowel-mark density in the coverage report." }
+  - { cv_locale: aii, epitran_code: aii-Syrc, script: Syrc, abjad: true,  notes: "Syriac script is an abjad; vowel points optional. Verify how often CV text has them." }
+  - { cv_locale: am,  epitran_code: amh-Ethi, script: Ethi, abjad: false, notes: "Ethiopic abugida. Verify which orthographic features Epitran cannot recover." }
+  - { cv_locale: ti,  epitran_code: tir-Ethi, script: Ethi, abjad: false, notes: "Ethiopic abugida. Verify, as for am." }
+  - { cv_locale: ckb, epitran_code: ckb-Arab, script: Arab, abjad: false, notes: "Arabic-based alphabet. Verify vowel representation." }
+  - { cv_locale: ur,  epitran_code: urd-Arab, script: Arab, abjad: false, notes: "Arabic-based script. Verify how many short vowels CV text leaves unwritten." }
+  - { cv_locale: ps,  epitran_code: pbu-Arab, script: Arab, abjad: false, notes: "Arabic-based script. Verify how many short vowels CV text leaves unwritten." }
+  - { cv_locale: ug,  epitran_code: uig-Arab, script: Arab, abjad: false, notes: "Arabic-based alphabet. Verify vowel representation." }
+  - { cv_locale: kab, epitran_code: kab-Latn, script: Latn, abjad: false, notes: "" }
+  - { cv_locale: kmr, epitran_code: kmr-Latn, script: Latn, abjad: false, notes: "" }
+  - { cv_locale: mt,  epitran_code: mlt-Latn, script: Latn, abjad: false, notes: "" }
+  - { cv_locale: so,  epitran_code: som-Latn, script: Latn, abjad: false, notes: "" }
+  - { cv_locale: aa,  epitran_code: aar-Latn, script: Latn, abjad: false, notes: "" }
+  - { cv_locale: uz,  epitran_code: uzb-Latn, script: Latn, abjad: false, notes: "" }
+  - { cv_locale: kk,  epitran_code: kaz-Cyrl, script: Cyrl, abjad: false, notes: "" }
+  - { cv_locale: kbd, epitran_code: kbd-Cyrl, script: Cyrl, abjad: false, notes: "" }
+  - { cv_locale: tg,  epitran_code: tgk-Cyrl, script: Cyrl, abjad: false, notes: "" }
+  - { cv_locale: ka,  epitran_code: kat-Geor, script: Geor, abjad: false, notes: "" }
+  - { cv_locale: cy,  epitran_code: cym-Latn, script: Latn, abjad: false, notes: "" }
+  - { cv_locale: af,  epitran_code: afr-Latn, script: Latn, abjad: false, notes: "" }
+  - { cv_locale: quy, epitran_code: quy-Latn, script: Latn, abjad: false, notes: "" }

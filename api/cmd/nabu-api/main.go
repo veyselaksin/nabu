@@ -17,6 +17,7 @@ import (
 	"github.com/veyselaksin/nabu/api/internal/server"
 	"github.com/veyselaksin/nabu/g2p"
 	"github.com/veyselaksin/nabu/g2p/rules"
+	"github.com/veyselaksin/nabu/tts"
 )
 
 func main() {
@@ -58,11 +59,30 @@ func run() error {
 		log.Info("loaded rule set", "id", rs.ID, "version", rs.Version, "source", source)
 	}
 
-	srv, err := server.New(sets, server.Options{
+	opts := server.Options{
 		Logger:         log,
 		MaxTextRunes:   cfg.MaxTextRunes,
 		RequestTimeout: cfg.RequestTimeout,
-	})
+	}
+	if cfg.TTSModel != "" {
+		// A configured but unloadable model is a deployment error: fail fast.
+		model, err := tts.Open(cfg.TTSModel, tts.Options{
+			LibraryPath:    cfg.ORTLibrary,
+			IntraOpThreads: cfg.TTSThreads,
+		})
+		if err != nil {
+			return fmt.Errorf("loading TTS model (NABU_TTS_MODEL): %w", err)
+		}
+		defer model.Close()
+		info := model.Info()
+		log.Info("loaded TTS model", "name", info.Name, "path", cfg.TTSModel, "sample_rate", info.SampleRate,
+			"speakers", len(info.Speakers), "languages", info.Languages)
+		opts.Synthesizer = model
+	} else {
+		log.Warn("speech synthesis disabled: NABU_TTS_MODEL is not set; POST /v1/speak will return 503")
+	}
+
+	srv, err := server.New(sets, opts)
 	if err != nil {
 		return err
 	}

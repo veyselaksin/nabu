@@ -94,7 +94,8 @@ func TestEndpoints(t *testing.T) {
 		{"g2p body too large", "POST", "/v1/g2p", `{"text":"` + strings.Repeat("n", 70<<10) + `","ruleset":"test-api"}`, 413, "body_too_large", nil},
 		{"g2p wrong method", "GET", "/v1/g2p", "", 405, "method_not_allowed", nil},
 		{"translate stub", "POST", "/v1/translate", `{"text":"hello","lang":"egy"}`, 501, "not_implemented", nil},
-		{"speak stub", "POST", "/v1/speak", `{"ipa":"x"}`, 501, "not_implemented", nil},
+		{"speak without model", "POST", "/v1/speak", `{"text":"n","ruleset":"test-api"}`, 503, "tts_unavailable", nil},
+		{"voices without model", "GET", "/v1/voices", "", 200, "", nil},
 		{"not found", "GET", "/v2/nothing", "", 404, "not_found", nil},
 	}
 	for _, tt := range tests {

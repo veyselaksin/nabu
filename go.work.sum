@@ -1,3 +1,5 @@
+github.com/yalue/onnxruntime_go v1.38.0 h1:rbEIjA428hAv5QD71NpkH7TT/Sg89cAuj8bRuwt8ZxQ=
+github.com/yalue/onnxruntime_go v1.38.0/go.mod h1:b4X26A8pekNb1ACJ58wAXgNKeUCGEAQ9dmACut9Sm/4=
 golang.org/x/mod v0.32.0/go.mod h1:SgipZ/3h2Ci89DlEtEXWUk/HteuRin+HHhN+WbNhguU=
 golang.org/x/sync v0.19.0/go.mod h1:9KTHXmSnoGruLpwFjVSX0lNNA75CykiMECbovNTZqGI=
 golang.org/x/tools v0.41.0/go.mod h1:XSY6eDqxVNiYgezAVqqCeihT4j1U2CCsqvH3WhQpnlg=
