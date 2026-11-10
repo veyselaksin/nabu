@@ -9,6 +9,11 @@ const ALLOWED = new Set([
   "MPL-2.0", "PostgreSQL", "BlueOak-1.0.0", "Zlib",
 ]);
 
+// Fonts only: the SIL Open Font License (OSI-approved, allows commercial use)
+// is accepted for font packages, not for code.
+const FONT_ONLY = new Set(["OFL-1.1"]);
+const isFontPackage = (name) => name.startsWith("@fontsource/");
+
 const lock = JSON.parse(readFileSync(new URL("../package-lock.json", import.meta.url), "utf8"));
 const bad = [];
 let count = 0;
@@ -18,7 +23,8 @@ for (const [path, meta] of Object.entries(lock.packages ?? {})) {
   const name = path.replace(/^.*node_modules\//, "");
   const expr = String(meta.license ?? "UNKNOWN").replace(/[()]/g, "");
   // "A OR B" is acceptable if any alternative is allowed; "A AND B" needs all.
-  const ok = expr.split(/\s+OR\s+/).some((alt) => alt.split(/\s+AND\s+/).every((l) => ALLOWED.has(l.trim())));
+  const allowed = (l) => ALLOWED.has(l) || (FONT_ONLY.has(l) && isFontPackage(name));
+  const ok = expr.split(/\s+OR\s+/).some((alt) => alt.split(/\s+AND\s+/).every((l) => allowed(l.trim())));
   if (!ok) bad.push(`${name}@${meta.version}: ${meta.license ?? "no license field"}`);
 }
 if (bad.length) {

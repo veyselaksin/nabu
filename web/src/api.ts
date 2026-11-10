@@ -61,6 +61,43 @@ export function toIPA(text: string, ruleset: string): Promise<G2PResult> {
   return request<G2PResult>("/v1/g2p", { method: "POST", body: JSON.stringify({ text, ruleset }) });
 }
 
+export interface DataSource {
+  id: string;
+  name: string;
+  url: string;
+  license: string;
+  attribution?: string;
+}
+
+export interface Sign {
+  value: string;
+  sign: string;
+  codepoint: string;
+  gardiner?: string;
+}
+
+export interface RenderedWord {
+  translit: string;
+  hieroglyphs: string;
+  /** "lexicon": attested spelling from a corpus; "phonetic": spelled sign by sign, not attested. */
+  method: "lexicon" | "phonetic";
+  attestation?: { hieroglyphs: string; count: number; total: number; variants: number };
+  signs?: Sign[];
+}
+
+export interface RenderResult {
+  input: string;
+  hieroglyphs: string;
+  words: RenderedWord[];
+  sources: DataSource[];
+  /** Whether the server has an attested-spelling lexicon loaded. */
+  lexicon: boolean;
+}
+
+export function render(text: string): Promise<RenderResult> {
+  return request<RenderResult>("/v1/render", { method: "POST", body: JSON.stringify({ text }) });
+}
+
 export interface VoicesInfo {
   available: boolean;
   message?: string;
@@ -86,6 +123,8 @@ export interface SpeakResult {
   reference: string;
   model: string;
   speaker: number;
+  /** Empty if some word has no hieroglyph sign; use render() for details. */
+  hieroglyphs: string;
 }
 
 // The API percent-encodes header values that may contain non-ASCII text.
@@ -128,5 +167,6 @@ export async function speak(
     reference: header(res, "X-Nabu-Reference"),
     model: header(res, "X-Nabu-Model"),
     speaker: Number(res.headers.get("X-Nabu-Speaker") ?? 0),
+    hieroglyphs: header(res, "X-Nabu-Hieroglyphs"),
   };
 }

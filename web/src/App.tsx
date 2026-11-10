@@ -2,10 +2,13 @@ import { useEffect, useId, useState, type FormEvent } from "react";
 import {
   ApiError,
   listRulesets,
+  render,
   speak,
   toIPA,
   voices,
   type G2PResult,
+  type RenderResult,
+  type RenderedWord,
   type RulesetInfo,
   type SpeakResult,
   type VoicesInfo,
@@ -17,6 +20,8 @@ const DISCLAIMER =
   "Nabu outputs follows a published scholarly reconstruction, named and cited with every result; " +
   "other scholars reconstruct these languages differently. The voice was trained on recordings " +
   "of modern languages, so it reads the reconstructed IPA with a modern speaker's voice and accent. " +
+  "Hieroglyphs are an attested spelling only where marked; otherwise they spell the word sign by sign, " +
+  "which is not how Egyptian scribes wrote. " +
   "This is an educational and research tool, not ground truth. The rule sets shipped right now " +
   "are placeholders for testing and are not yet sourced from their references.";
 
@@ -35,6 +40,8 @@ export function App() {
   const [spoken, setSpoken] = useState<Spoken | null>(null);
   const [voice, setVoice] = useState<VoicesInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [glyphs, setGlyphs] = useState<RenderResult | null>(null);
+  const [glyphError, setGlyphError] = useState<string | null>(null);
   const [busy, setBusy] = useState<"convert" | "speak" | null>(null);
 
   useEffect(() => {
@@ -61,16 +68,30 @@ export function App() {
     };
   }, [spoken]);
 
+  // Script rendering is independent of G2P: a word without a sign must not
+  // hide the IPA, and vice versa, so its errors are shown separately.
+  async function refreshGlyphs(input: string) {
+    try {
+      setGlyphs(await render(input));
+      setGlyphError(null);
+    } catch (err) {
+      setGlyphs(null);
+      setGlyphError(message(err));
+    }
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setBusy("convert");
     setError(null);
+    const glyphsDone = refreshGlyphs(text);
     try {
       setResult(await toIPA(text, ruleset));
     } catch (err) {
       setResult(null);
       setError(message(err));
     } finally {
+      await glyphsDone;
       setBusy(null);
     }
   }
@@ -78,6 +99,7 @@ export function App() {
   async function onSpeak() {
     setBusy("speak");
     setError(null);
+    const glyphsDone = refreshGlyphs(text);
     try {
       const r = await speak(text, ruleset);
       setSpoken({ ...r, url: URL.createObjectURL(r.audio) });
@@ -86,6 +108,7 @@ export function App() {
       setSpoken(null);
       setError(message(err));
     } finally {
+      await glyphsDone;
       setBusy(null);
     }
   }
@@ -105,7 +128,8 @@ export function App() {
 
       <h1>Nabu</h1>
       <p className="lede">
-        Convert a transliteration to IPA using a published pronunciation reconstruction, and hear it spoken.
+        Render a transliteration in hieroglyphs, convert it to IPA using a published pronunciation reconstruction,
+        and hear it spoken.
       </p>
 
       <form onSubmit={onSubmit}>
@@ -159,6 +183,13 @@ export function App() {
       </form>
 
       <section aria-live="polite" className="output">
+        <h2>Hieroglyphs</h2>
+        {glyphError && <p className="error">{glyphError}</p>}
+        {glyphs && !glyphError && <Hieroglyphs result={glyphs} />}
+        {!glyphs && !glyphError && <p className="muted">Press Convert or Speak to render the text.</p>}
+      </section>
+
+      <section aria-live="polite" className="output">
         <h2>IPA</h2>
         {error && <p className="error">{error}</p>}
         {result && !error && (
@@ -190,6 +221,55 @@ export function App() {
       </section>
     </main>
   );
+}
+
+function Hieroglyphs({ result }: { result: RenderResult }) {
+  const phonetic = result.words.some((w) => w.method === "phonetic" && w.hieroglyphs !== "");
+  const attested = result.words.some((w) => w.method === "lexicon");
+  return (
+    <>
+      <p className="glyphs" lang="egy-Egyp">
+        {result.words
+          .filter((w) => w.hieroglyphs !== "")
+          .map((w, i) => (
+            <span key={i} className={`glyph-word ${w.method}`} title={wordTitle(w)}>
+              {w.hieroglyphs}
+            </span>
+          ))}
+      </p>
+      {(phonetic || attested) && (
+        <ul className="legend small">
+          {attested && (
+            <li>
+              <span className="swatch lexicon" aria-hidden="true" /> Attested spelling: the most frequent spelling of
+              this word form in the corpus below.
+            </li>
+          )}
+          {phonetic && (
+            <li>
+              <span className="swatch phonetic" aria-hidden="true" /> Spelled sign by sign from one-consonant signs
+              {result.lexicon ? " (word not found in the corpus)" : ""}. Not an attested spelling: scribes combined
+              multi-consonant signs, phonetic complements and classifiers.
+            </li>
+          )}
+        </ul>
+      )}
+      {result.sources.map((s) => (
+        <p key={s.id} className="reference">
+          Data: <a href={s.url}>{s.name}</a> ({s.license}){s.attribution ? `. ${s.attribution}` : ""}
+        </p>
+      ))}
+    </>
+  );
+}
+
+function wordTitle(w: RenderedWord): string {
+  if (w.method === "lexicon" && w.attestation) {
+    const a = w.attestation;
+    return `${w.translit}: attested ${a.count} of ${a.total} times in this spelling (${a.variants} spelling${a.variants === 1 ? "" : "s"} in the corpus)`;
+  }
+  const signs = (w.signs ?? []).map((s) => `${s.value} = ${s.gardiner || s.codepoint}`).join(", ");
+  return `${w.translit}: phonetic spelling, not attested (${signs})`;
 }
 
 function message(e: unknown): string {

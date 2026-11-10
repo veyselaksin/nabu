@@ -5,6 +5,7 @@ go 1.24.0
 require (
 	github.com/go-chi/chi/v5 v5.5.0
 	github.com/veyselaksin/nabu/g2p v0.0.0
+	github.com/veyselaksin/nabu/script v0.0.0
 	github.com/veyselaksin/nabu/tts v0.0.0
 )
 
@@ -18,5 +19,6 @@ require (
 // and `go mod tidy` working too.
 replace (
 	github.com/veyselaksin/nabu/g2p => ../g2p
+	github.com/veyselaksin/nabu/script => ../script
 	github.com/veyselaksin/nabu/tts => ../tts
 )

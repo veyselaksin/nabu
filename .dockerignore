@@ -2,6 +2,11 @@
 !go.work
 !go.work.sum
 !g2p/
+!script/
+!data/
+# Downloaded corpora and anything built from them (e.g. the CC BY-SA TLA lexicon)
+# must never enter an image.
+data/corpora/
 !api/
 !tts/
 tts/train/

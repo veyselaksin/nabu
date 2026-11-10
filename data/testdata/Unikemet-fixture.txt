@@ -1,0 +1,25 @@
+# Unikemet-99.0.0.txt
+# Synthetic fixture for tests: a few real-looking records, trimmed.
+U+13216	kEH_Core	C
+U+13216	kEH_Func	Phonemogram
+U+13216	kEH_FVal	n
+U+13216	kEH_JSesh	N35
+U+132D4	kEH_Core	C
+U+132D4	kEH_Func	Phonemogram
+U+132D4	kEH_FVal	n
+U+132D4	kEH_JSesh	S3
+U+132F9	kEH_Core	C
+U+132F9	kEH_Func	Logogram (life)
+U+132F9	kEH_FVal	ꜥnḫ
+U+1309D	kEH_Func	Phonemogram 
+U+1309D	kEH_FVal	ꜥ
+U+1309D	kEH_JSesh	D36
+U+133BA	kEH_Core	C
+U+133BA	kEH_Func	Phonemogram
+U+133BA	kEH_FVal	ꜥ
+U+13001	kEH_Func	Phonemogram
+U+13001	kEH_FVal	x
+U+13002	kEH_Func	Phonemogram
+U+13002	kEH_FVal	nn
+U+13003	kEH_Func	Phonemogram
+U+13003	kEH_FVal	i̯

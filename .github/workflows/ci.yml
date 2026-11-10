@@ -23,18 +23,20 @@ jobs:
           cache-dependency-path: "**/go.sum"
       - name: gofmt
         run: |
-          out=$(gofmt -l g2p tts api)
+          out=$(gofmt -l g2p script data tts api)
           if [ -n "$out" ]; then echo "::error::gofmt needed:"; echo "$out"; exit 1; fi
       - name: go vet
-        run: go vet ./g2p/... ./tts/... ./api/...
+        run: go vet ./g2p/... ./script/... ./data/... ./tts/... ./api/...
       # tts.TestModelIntegration is skipped here (no model); the tts job runs it.
       - name: go test
-        run: go test -race ./g2p/... ./tts/... ./api/...
-      - name: g2p builds for WASM
-        run: GOOS=js GOARCH=wasm go build ./g2p/...
+        run: go test -race ./g2p/... ./script/... ./data/... ./tts/... ./api/...
+      - name: g2p and script build for WASM
+        run: GOOS=js GOARCH=wasm go build ./g2p/... ./script/...
       - name: modules are tidy
         run: |
           (cd g2p && go mod tidy -diff)
+          (cd script && go mod tidy -diff)
+          (cd data && go mod tidy -diff)
           (cd tts && go mod tidy -diff)
           (cd api && go mod tidy -diff)
 
@@ -95,6 +97,20 @@ jobs:
       - name: dependency licenses
         run: npm run licenses
       - run: npm run build
+
+  # Rebuilds the committed sign list from the pinned upstream files and checks
+  # it is byte-identical (TestCommittedSignListIsReproducible), and that a
+  # lexicon builds and loads. Downloads ~6 MB; nothing is committed or cached.
+  data:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "**/go.sum"
+      - run: go run ./data/cmd/nabu-data fetch unikemet tla
+      - run: go test -count=1 -run Reproducible -v ./data/cmd/nabu-data
 
   docker:
     runs-on: ubuntu-latest

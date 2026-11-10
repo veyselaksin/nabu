@@ -20,6 +20,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/veyselaksin/nabu/g2p"
+	"github.com/veyselaksin/nabu/script"
 	"github.com/veyselaksin/nabu/tts"
 )
 
@@ -38,6 +39,9 @@ type Options struct {
 	RequestTimeout time.Duration
 	// Synthesizer enables POST /v1/speak. If nil, /v1/speak returns 503.
 	Synthesizer Synthesizer
+	// Renderer enables POST /v1/render and the X-Nabu-Hieroglyphs header of
+	// /v1/speak. If nil, /v1/render returns 503.
+	Renderer *script.Renderer
 }
 
 // Server serves the Nabu API over a fixed set of rule sets.
@@ -85,6 +89,7 @@ func (s *Server) Handler() http.Handler {
 	r.Route("/v1", func(r chi.Router) {
 		r.Get("/rulesets", s.listRulesets)
 		r.Post("/g2p", s.g2p)
+		r.Post("/render", s.render)
 		r.Post("/translate", s.notImplemented("translation is not implemented yet"))
 		r.Post("/speak", s.speak)
 		r.Get("/voices", s.voices)
@@ -150,9 +155,7 @@ func (s *Server) toIPA(w http.ResponseWriter, r *http.Request, text, ruleset str
 			fmt.Sprintf("unknown ruleset %q; see GET /v1/rulesets", ruleset), nil)
 		return nil, "", false
 	}
-	if n := utf8.RuneCountInString(text); n > s.opts.MaxTextRunes {
-		writeError(w, http.StatusRequestEntityTooLarge, "text_too_long",
-			fmt.Sprintf("text has %d characters; the limit is %d", n, s.opts.MaxTextRunes), nil)
+	if !s.checkLength(w, text) {
 		return nil, "", false
 	}
 
@@ -177,6 +180,63 @@ func (s *Server) toIPA(w http.ResponseWriter, r *http.Request, text, ruleset str
 	return rs, ipa, true
 }
 
+type renderRequest struct {
+	Text string `json:"text"`
+}
+
+type renderResponse struct {
+	*script.Rendering
+	// Lexicon reports whether an attested-spelling lexicon is loaded. Without
+	// one, every word is spelled phonetically.
+	Lexicon bool `json:"lexicon"`
+}
+
+const renderUnavailable = "hieroglyph rendering is not configured on this server"
+
+func (s *Server) render(w http.ResponseWriter, r *http.Request) {
+	if s.opts.Renderer == nil {
+		writeError(w, http.StatusServiceUnavailable, "render_unavailable", renderUnavailable, nil)
+		return
+	}
+	var req renderRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if !s.checkLength(w, req.Text) {
+		return
+	}
+	res, err := s.opts.Renderer.Render(req.Text)
+	var noSign *script.NoSignError
+	var badUTF8 *script.InvalidUTF8Error
+	switch {
+	case errors.As(err, &noSign):
+		writeError(w, http.StatusUnprocessableEntity, "no_sign", noSign.Error(), map[string]any{
+			"grapheme": noSign.Grapheme,
+			"offset":   noSign.Offset,
+			"word":     noSign.Word,
+		})
+		return
+	case errors.As(err, &badUTF8):
+		writeError(w, http.StatusBadRequest, "invalid_utf8", "text is not valid UTF-8", nil)
+		return
+	case err != nil:
+		s.log.ErrorContext(r.Context(), "render failed", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal", "internal error", nil)
+		return
+	}
+	writeJSON(w, http.StatusOK, renderResponse{Rendering: res, Lexicon: s.opts.Renderer.HasLexicon()})
+}
+
+// checkLength writes a 413 response and returns false if text is too long.
+func (s *Server) checkLength(w http.ResponseWriter, text string) bool {
+	if n := utf8.RuneCountInString(text); n > s.opts.MaxTextRunes {
+		writeError(w, http.StatusRequestEntityTooLarge, "text_too_long",
+			fmt.Sprintf("text has %d characters; the limit is %d", n, s.opts.MaxTextRunes), nil)
+		return false
+	}
+	return true
+}
+
 type speakRequest struct {
 	Text    string   `json:"text"`
 	Ruleset string   `json:"ruleset"`
@@ -193,10 +253,11 @@ const (
 	headerReference      = "X-Nabu-Reference"
 	headerModel          = "X-Nabu-Model"
 	headerSpeaker        = "X-Nabu-Speaker"
+	headerHieroglyphs    = "X-Nabu-Hieroglyphs"
 )
 
 var exposedHeaders = headerIPA + ", " + headerRuleset + ", " + headerRulesetVersion + ", " +
-	headerReference + ", " + headerModel + ", " + headerSpeaker
+	headerReference + ", " + headerModel + ", " + headerSpeaker + ", " + headerHieroglyphs
 
 const ttsUnavailable = "speech synthesis is not configured on this server: set NABU_TTS_MODEL " +
 	"to a model exported with nabu-tts-export (see tts/train/README.md)"
@@ -272,6 +333,13 @@ func (s *Server) speak(w http.ResponseWriter, r *http.Request) {
 	h.Set(headerReference, url.PathEscape(rs.Reference))
 	h.Set(headerModel, url.PathEscape(s.opts.Synthesizer.Info().Name))
 	h.Set(headerSpeaker, strconv.Itoa(params.Speaker))
+	// Best effort: speech does not depend on the script, so a word without a
+	// sign only omits the header. Use POST /v1/render for per-word details.
+	if s.opts.Renderer != nil {
+		if res, err := s.opts.Renderer.Render(req.Text); err == nil && res.Hieroglyphs != "" {
+			h.Set(headerHieroglyphs, url.PathEscape(res.Hieroglyphs))
+		}
+	}
 	h.Set("Access-Control-Expose-Headers", exposedHeaders)
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(buf.Bytes())

@@ -15,7 +15,7 @@ func TestFromEnvDefaults(t *testing.T) {
 	}
 	if c.Addr != ":8080" || c.LogLevel != slog.LevelInfo || c.LogFormat != "json" ||
 		c.MaxTextRunes != 2000 || c.RequestTimeout != 10*time.Second || c.RulesDir != "" ||
-		c.TTSModel != "" || c.ORTLibrary != "" || c.TTSThreads != 0 {
+		c.TTSModel != "" || c.ORTLibrary != "" || c.TTSThreads != 0 || c.Lexicon != "" {
 		t.Errorf("unexpected defaults: %+v", c)
 	}
 }
@@ -25,13 +25,15 @@ func TestFromEnvOverrides(t *testing.T) {
 		"NABU_ADDR": "127.0.0.1:9000", "NABU_RULES_DIR": "/rules", "NABU_LOG_LEVEL": "debug",
 		"NABU_LOG_FORMAT": "text", "NABU_MAX_TEXT_RUNES": "10", "NABU_REQUEST_TIMEOUT": "2s",
 		"NABU_TTS_MODEL": "/m/model.onnx", "NABU_ORT_LIB": "/lib/libonnxruntime.so.1.31.0", "NABU_TTS_THREADS": "2",
+		"NABU_LEXICON": "/data/lexicon-egy.tsv",
 	}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := Config{Addr: "127.0.0.1:9000", RulesDir: "/rules", LogLevel: slog.LevelDebug,
 		LogFormat: "text", MaxTextRunes: 10, RequestTimeout: 2 * time.Second,
-		TTSModel: "/m/model.onnx", ORTLibrary: "/lib/libonnxruntime.so.1.31.0", TTSThreads: 2}
+		TTSModel: "/m/model.onnx", ORTLibrary: "/lib/libonnxruntime.so.1.31.0", TTSThreads: 2,
+		Lexicon: "/data/lexicon-egy.tsv"}
 	if c != want {
 		t.Errorf("got %+v, want %+v", c, want)
 	}

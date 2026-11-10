@@ -17,6 +17,7 @@ import (
 	"github.com/veyselaksin/nabu/api/internal/server"
 	"github.com/veyselaksin/nabu/g2p"
 	"github.com/veyselaksin/nabu/g2p/rules"
+	"github.com/veyselaksin/nabu/script"
 	"github.com/veyselaksin/nabu/tts"
 )
 
@@ -80,6 +81,22 @@ func run() error {
 		opts.Synthesizer = model
 	} else {
 		log.Warn("speech synthesis disabled: NABU_TTS_MODEL is not set; POST /v1/speak will return 503")
+	}
+
+	// The sign list is embedded; a lexicon is optional. A configured but
+	// unreadable lexicon is a deployment error: fail fast.
+	var lex *script.Lexicon
+	if cfg.Lexicon != "" {
+		if lex, err = script.LoadLexicon(cfg.Lexicon); err != nil {
+			return fmt.Errorf("loading lexicon (NABU_LEXICON): %w", err)
+		}
+		log.Info("loaded lexicon", "id", lex.Source.ID, "forms", lex.Len(), "license", lex.Source.License,
+			"path", cfg.Lexicon)
+	} else {
+		log.Info("no lexicon (NABU_LEXICON unset): /v1/render spells every word phonetically")
+	}
+	if opts.Renderer, err = script.Egyptian(lex); err != nil {
+		return fmt.Errorf("loading hieroglyph sign list: %w", err)
 	}
 
 	srv, err := server.New(sets, opts)

@@ -1,8 +1,8 @@
 GO      ?= go
 UV      ?= uv
 NPM     ?= npm
-GO_PKGS := ./g2p/... ./tts/... ./api/...
-GO_DIRS := g2p tts api
+GO_PKGS := ./g2p/... ./script/... ./data/... ./tts/... ./api/...
+GO_DIRS := g2p script data tts api
 RULES   ?= g2p/rules/egy-allen.yaml
 # ONNX Runtime shared library for the Go TTS runtime. Recipes that need it
 # fetch it on demand (scripts/fetch-ort.sh prints the path); set NABU_ORT_LIB
@@ -10,11 +10,14 @@ RULES   ?= g2p/rules/egy-allen.yaml
 ORT_LIB = $${NABU_ORT_LIB:-$$(scripts/fetch-ort.sh .ort)}
 MODEL   ?= runs/smoke/model.onnx
 LABEL   ?=
+# Optional TLA spelling lexicon (CC BY-SA 4.0, built locally by `make lexicon`).
+LEXICON ?= data/corpora/tla/lexicon-egy.tsv
 
 .DEFAULT_GOAL := help
 .PHONY: help test test-go test-py lint lint-go lint-py lint-web fmt build-web \
         run-api run-web g2p wasm licenses golden clean ort py-train \
-        tts-smoke tts-smoke-data tts-smoke-train tts-export tts-samples test-tts-integration
+        tts-smoke tts-smoke-data tts-smoke-train tts-export tts-samples test-tts-integration \
+        script data-fetch signs lexicon
 
 help: ## Show this help
 	@awk 'BEGIN{FS=":.*## "} /^[a-z-]+:.*## /{printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -45,13 +48,14 @@ fmt: ## Format Go and Python code
 	$(UV) run ruff format .
 	$(UV) run ruff check --fix .
 
-wasm: ## Check that the g2p package builds for GOOS=js GOARCH=wasm
-	GOOS=js GOARCH=wasm $(GO) build ./g2p/...
+wasm: ## Check that the g2p and script packages build for GOOS=js GOARCH=wasm
+	GOOS=js GOARCH=wasm $(GO) build ./g2p/... ./script/...
 
 build-web: web/node_modules ## Production build of the web demo
 	cd web && $(NPM) run build
 
-run-api: ## Run the API on :8080 (env: NABU_TTS_MODEL enables /v1/speak; NABU_ADDR, ...)
+run-api: ## Run the API on :8080 (uses $(LEXICON) if built; NABU_TTS_MODEL enables /v1/speak)
+	NABU_LEXICON=$${NABU_LEXICON-$(if $(wildcard $(LEXICON)),$(LEXICON))} \
 	NABU_ORT_LIB=$${NABU_ORT_LIB:-$(abspath $(firstword $(wildcard .ort/lib/libonnxruntime*)))} \
 	  $(GO) run ./api/cmd/nabu-api
 
@@ -61,8 +65,21 @@ run-web: web/node_modules ## Run the web demo on :5173 (proxies /v1 to :8080)
 g2p: ## Build the CLI to bin/nabu-g2p (try: make g2p && bin/nabu-g2p --rules $(RULES) ꜥnḫ)
 	$(GO) build -o bin/nabu-g2p ./g2p/cmd/nabu-g2p
 
+script: ## Build the CLI to bin/nabu-script (try: bin/nabu-script ꜥnḫ)
+	$(GO) build -o bin/nabu-script ./script/cmd/nabu-script
+
+data-fetch: ## Download Unikemet + TLA (pinned, checksum-verified) into data/corpora/
+	$(GO) run ./data/cmd/nabu-data fetch unikemet tla
+
+signs: data-fetch ## Rebuild script/signs/egy-unikemet-uniliterals.tsv from Unikemet + TLA (review the diff!)
+	$(GO) run ./data/cmd/nabu-data build-signs
+
+lexicon: data-fetch ## Build the TLA spelling lexicon into $(LEXICON) (CC BY-SA 4.0; never commit it)
+	$(GO) run ./data/cmd/nabu-data build-lexicon --out $(LEXICON)
+
 golden: ## Regenerate g2p golden files after an intentional output change (review the diff!)
 	$(GO) test ./g2p/... -run 'TestGolden|TestRun' -update
+	$(GO) test ./script/... -run 'TestRun' -update
 
 licenses: web/node_modules ## Check npm dependency licenses against the allowlist
 	cd web && $(NPM) run licenses

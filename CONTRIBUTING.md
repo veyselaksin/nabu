@@ -9,12 +9,14 @@ Requirements: Go ≥ 1.24 with a C compiler (cgo, for the ONNX Runtime binding i
 `tts/`), [uv](https://docs.astral.sh/uv/), Node.js ≥ 22. No GPU is needed.
 
 ```sh
-uv sync                 # Python workspace (translate, tts, eval, data) + ruff/pytest
+uv sync                 # Python workspace (translate, tts, eval) + ruff/pytest
 make test               # go test + pytest
 make lint               # gofmt, go vet, WASM build check, ruff, tsc
 make run-api            # API on http://localhost:8080
 make run-web            # web demo on http://localhost:5173 (proxies to the API)
 make g2p && bin/nabu-g2p --rules g2p/rules/egy-allen.yaml "ꜥnḫ"
+make script && bin/nabu-script "ꜥnḫ"
+make lexicon            # optional: download TLA, build the local spelling lexicon
 
 # Speech (optional): training extras, CPU smoke model, ONNX Runtime, Go integration test
 make py-train tts-smoke ort test-tts-integration
@@ -47,7 +49,10 @@ Every dependency (direct or transitive, in any language) must be under an
 OSI-approved license that permits commercial use.
 
 - **Allowed:** MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD,
-  MPL-2.0, PostgreSQL, BlueOak-1.0.0, Zlib.
+  MPL-2.0, PostgreSQL, BlueOak-1.0.0, Zlib. For fonts only: OFL-1.1.
+- **Data:** see [DATA_LICENSES.md](DATA_LICENSES.md). Unicode data files are
+  Unicode-3.0. Share-alike corpus data (e.g. TLA, CC BY-SA 4.0) is never
+  committed or embedded; only tools that build from it are.
 - **Not allowed:** GPL/LGPL/AGPL, SSPL, any non-commercial (NC) license, and
   custom or "responsible AI" model licenses. Model weights and voices count as
   dependencies.

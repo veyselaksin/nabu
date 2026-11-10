@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1
-# Build from the repository root (the Go workspace spans g2p/, tts/ and api/):
+# Build from the repository root (the Go workspace spans g2p/, script/, data/,
+# tts/ and api/):
 #   docker build -f api/Dockerfile -t nabu-api .
 #
 # Speech synthesis needs a model exported by nabu-tts-export. Models are not
@@ -7,6 +8,10 @@
 #   docker run -p 8080:8080 -v "$PWD/runs/full:/models:ro" \
 #     -e NABU_TTS_MODEL=/models/model.onnx nabu-api
 # Without NABU_TTS_MODEL the API runs and POST /v1/speak returns 503.
+#
+# The hieroglyph sign list is embedded. The optional TLA spelling lexicon
+# (CC BY-SA 4.0) is never baked in either; build it with `make lexicon` and
+# mount it:  -v "$PWD/data/corpora/tla:/lexicon:ro" -e NABU_LEXICON=/lexicon/lexicon-egy.tsv
 
 FROM golang:1.24-bookworm AS build
 WORKDIR /src
@@ -17,13 +22,17 @@ COPY scripts/fetch-ort.sh ./scripts/
 RUN ./scripts/fetch-ort.sh /ort
 COPY go.work ./
 COPY g2p/go.mod g2p/go.sum ./g2p/
+COPY script/go.mod script/go.sum ./script/
+COPY data/go.mod data/go.sum ./data/
 COPY tts/go.mod tts/go.sum ./tts/
 COPY api/go.mod api/go.sum ./api/
 RUN go mod download
 COPY g2p/ ./g2p/
+COPY script/ ./script/
+COPY data/ ./data/
 COPY tts/ ./tts/
 COPY api/ ./api/
-RUN go test ./g2p/... ./tts/... ./api/... \
+RUN go test ./g2p/... ./script/... ./data/... ./tts/... ./api/... \
  && go build -trimpath -ldflags="-s -w" -o /out/nabu-api ./api/cmd/nabu-api \
  && mkdir -p /out/lib /out/licenses \
  && cp /ort/lib/libonnxruntime.so.* /out/lib/ \

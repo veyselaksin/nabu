@@ -31,6 +31,10 @@ type Config struct {
 	// ORTLibrary is the ONNX Runtime shared library to load (default: the
 	// platform's library name on the loader's search path). Env: NABU_ORT_LIB.
 	ORTLibrary string
+	// Lexicon is a spelling lexicon built by `nabu-data build-lexicon`. If set,
+	// /v1/render uses attested spellings for the words it contains; otherwise
+	// every word is spelled phonetically. Env: NABU_LEXICON.
+	Lexicon string
 	// TTSThreads limits ONNX Runtime threads per request (0 = ORT default).
 	// Env: NABU_TTS_THREADS.
 	TTSThreads int
@@ -43,6 +47,7 @@ func FromEnv(getenv func(string) string) (Config, error) {
 		RulesDir:       strings.TrimSpace(getenv("NABU_RULES_DIR")),
 		TTSModel:       strings.TrimSpace(getenv("NABU_TTS_MODEL")),
 		ORTLibrary:     strings.TrimSpace(getenv("NABU_ORT_LIB")),
+		Lexicon:        strings.TrimSpace(getenv("NABU_LEXICON")),
 		LogLevel:       slog.LevelInfo,
 		LogFormat:      "json",
 		MaxTextRunes:   2000,

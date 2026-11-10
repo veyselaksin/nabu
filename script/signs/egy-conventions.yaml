@@ -1,0 +1,41 @@
+# Transliteration conventions for rendering Middle Egyptian in hieroglyphs.
+#
+# The embedded sign list (egy-unikemet-uniliterals.tsv) uses the sign values of
+# the Unicode Unikemet database, and the optional TLA lexicon uses the Leiden
+# Unified Transliteration (LUT). Users may type either. This file says which
+# input marks are not written at all (separators) and which spellings are the
+# same value written differently (aliases).
+#
+# Every entry needs a note saying why. Do not add an alias from memory: cite
+# where the equivalence is documented, or mark it TODO(source).
+#
+# TODO(decision): further aliases between conventions are NOT included yet and
+#   currently make rendering fail with "no sign spells …":
+#   - "z" (used by TLA) has no Unikemet uniliteral; Unikemet gives both S29
+#     and O34 the value "s".
+#   - "j" / "i" / "ỉ" / "i̯" as other conventions' spellings of yod "ꞽ".
+#   - "ẖ": Unikemet lists no uniliteral phonemogram with this value (F32 is
+#     a logogram "ẖ.t").
+#   Decide each one with a source before adding it.
+language: egy
+separators:
+  - match: "."
+    note: >-
+      Editorial boundary before endings (e.g. ꜥnḫ.t). Not written; TLA
+      transliterations and Unikemet values use it (see the dataset card at
+      https://huggingface.co/datasets/thesaurus-linguae-aegyptiae/tla-Earlier_Egyptian_original-v18-premium).
+  - match: "="
+    note: >-
+      Editorial boundary before suffix pronouns (e.g. =f). Not written; TLA
+      writes suffix pronouns as separate tokens starting with "=".
+  - match: "-"
+    note: >-
+      Editorial boundary inside compounds and names (e.g. nm.tꞽ-nḫt). Not
+      written.
+aliases:
+  - match: "q"
+    canonical: "ḳ"
+    note: >-
+      Same value, two conventions: Unikemet gives sign N29 (U+1320E) the value
+      "ḳ", while TLA's Leiden Unified Transliteration writes it "q" (TLA v18
+      uses "q" and never "ḳ"). Checked against both data files.

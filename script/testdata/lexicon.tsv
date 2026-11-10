@@ -1,0 +1,13 @@
+#@id: test-lexicon
+#@language: egy
+#@source: Synthetic test fixture
+#@source_url: https://example.invalid/test
+#@source_sha256: 0000
+#@license: Apache-2.0
+#@attribution: Nabu test fixture
+# SYNTHETIC: the spellings below are arbitrary signs chosen for tests. They are
+# NOT attested spellings of these words. Real lexicons are never committed.
+form	hieroglyphs	count	total	variants
+ꜥnḫ	𓀀	3	4	2
+ḳd	𓀁	1	1	1
+zꜣ	𓀂	2	2	1

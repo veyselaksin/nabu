@@ -40,7 +40,7 @@ English text
     │  transliteration + confidence score
     ▼
 ┌───────────────────────────────┐
-│ 2. Script rendering           │  sign-list lookup
+│ 2. Script rendering           │  corpus lexicon + sign list
 └───────────────────────────────┘
     │  Unicode hieroglyphs / cuneiform
     ▼
@@ -59,8 +59,10 @@ English text
 
 1. **Translation**: an LLM fine-tuned with LoRA, grounded with retrieval (RAG),
    produces a transliteration and a confidence score.
-2. **Script rendering**: the transliteration is mapped to Unicode signs through a
-   sign list (Egyptian hieroglyphs, cuneiform).
+2. **Script rendering**: each word gets its most frequent attested spelling from
+   a corpus lexicon (TLA). Words the lexicon doesn't have are spelled sign by
+   sign from the Unicode sign list and labeled as unattested. Scribes didn't
+   write that way.
 3. **Pronunciation**: a rule-based grapheme-to-phoneme engine converts the
    transliteration to IPA according to a named reconstruction.
 4. **Speech**: a VITS model that takes IPA as input synthesizes a `.wav` file.
@@ -97,6 +99,7 @@ There are **no non-commercial (NC) models or weights** anywhere in the project.
 | TTS training audio  | Mozilla Common Voice                            | CC0            |
 | Web demo            | React, Vite, TypeScript                         | MIT, MIT, Apache-2.0 |
 | Fonts               | Noto Sans Egyptian Hieroglyphs, Noto Sans Cuneiform | OFL-1.1    |
+| Hieroglyph sign data | Unicode Unikemet database                      | Unicode-3.0    |
 
 **About text corpora.** The scholarly corpora Nabu learns from (ORACC, CDLI, TLA)
 carry their own licenses, and some are share-alike. To respect those terms, Nabu
@@ -119,8 +122,9 @@ training ecosystem lives there.
 ```
 nabu/
 ├── g2p/                 Go rule engine + CLI (nabu-g2p) + rules/*.yaml
+├── script/              Go hieroglyph renderer + CLI (nabu-script) + signs/ (embedded sign list)
 ├── api/                 Go HTTP service
-├── data/                Go download/cleaning tools (no raw data committed)
+├── data/                Go download/build tools (nabu-data; no corpus data committed)
 ├── eval/                Go metrics + held-out test sets
 ├── translate/train/     Python LoRA fine-tuning
 ├── tts/                 Go TTS runtime (ONNX Runtime) + CLI (nabu-tts) + symbols.txt
@@ -132,8 +136,9 @@ nabu/
 
 > [!WARNING]
 > Nabu is in early development. Interfaces, rule files and output formats will
-> change without notice. G2P works; the speech pipeline runs end to end, but no
-> real voice has been trained yet (only a synthetic smoke-test model).
+> change without notice. G2P and hieroglyph rendering work; the speech pipeline
+> runs end to end, but no real voice has been trained yet (only a synthetic
+> smoke-test model).
 
 Requires Go.
 
@@ -143,6 +148,13 @@ cd nabu
 
 # Transliteration → IPA, using the egy-allen reconstruction
 go run ./g2p/cmd/nabu-g2p --rules g2p/rules/egy-allen.yaml "ꜥnḫ"
+
+# Transliteration → hieroglyphs (sign by sign; * marks unattested spellings)
+go run ./script/cmd/nabu-script "ꜥnḫ"
+
+# Attested spellings: download TLA (CC BY-SA 4.0) and build a local lexicon
+make lexicon
+go run ./script/cmd/nabu-script --lexicon data/corpora/tla/lexicon-egy.tsv "ꜥnḫ"
 ```
 
 Speech pipeline smoke test (also needs [uv](https://docs.astral.sh/uv/) and a C
