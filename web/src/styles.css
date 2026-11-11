@@ -244,3 +244,35 @@ button:disabled {
 .tooltip:not([data-tooltip])::after {
   display: none;
 }
+
+.translation {
+  margin-top: 0.75rem;
+}
+
+.translit {
+  font-size: 1.5rem;
+  font-family: "Charis SIL", "Doulos SIL", "Noto Serif", "Times New Roman", serif;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.6rem;
+  overflow-wrap: anywhere;
+}
+
+.translit-word.attested {
+  border-bottom: 2px solid var(--accent);
+}
+
+.translit-word.unattested {
+  border-bottom: 2px dashed var(--muted);
+}
+
+.examples {
+  padding-left: 1.5rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.examples li {
+  overflow-wrap: anywhere;
+}

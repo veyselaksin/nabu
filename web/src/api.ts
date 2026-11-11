@@ -170,3 +170,41 @@ export async function speak(
     hieroglyphs: header(res, "X-Nabu-Hieroglyphs"),
   };
 }
+
+export interface TranslatorInfo {
+  available: boolean;
+  message?: string;
+  model?: string;
+}
+
+export function translator(): Promise<TranslatorInfo> {
+  return request<TranslatorInfo>("/v1/translator");
+}
+
+export interface TranslationExample {
+  transliteration: string;
+  /** The TLA editors' German translation. */
+  translation: string;
+  date_not_before?: string;
+  date_not_after?: string;
+  score: number;
+}
+
+export interface TranslateResult {
+  input: string;
+  transliteration: string;
+  /** Each output word and whether that form occurs in the corpus. */
+  words: { form: string; attested: boolean; count: number }[];
+  /** Share of output words attested in the corpus: a vocabulary check, not accuracy. */
+  confidence: number;
+  notes?: string;
+  /** German search terms used to retrieve the examples. */
+  keywords: string[];
+  examples: TranslationExample[];
+  model: string;
+  sources: DataSource[];
+}
+
+export function translate(text: string): Promise<TranslateResult> {
+  return request<TranslateResult>("/v1/translate", { method: "POST", body: JSON.stringify({ text, lang: "egy" }) });
+}

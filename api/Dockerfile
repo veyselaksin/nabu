@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # Build from the repository root (the Go workspace spans g2p/, script/, data/,
-# tts/ and api/):
+# translate/, tts/ and api/):
 #   docker build -f api/Dockerfile -t nabu-api .
 #
 # Speech synthesis needs a model exported by nabu-tts-export. Models are not
@@ -12,6 +12,11 @@
 # The hieroglyph sign list is embedded. The optional TLA spelling lexicon
 # (CC BY-SA 4.0) is never baked in either; build it with `make lexicon` and
 # mount it:  -v "$PWD/data/corpora/tla:/lexicon:ro" -e NABU_LEXICON=/lexicon/lexicon-egy.tsv
+#
+# Translation needs the TLA corpus (CC BY-SA 4.0, mounted the same way) and an
+# OpenAI-compatible model server reachable from the container:
+#   -v "$PWD/data/corpora/tla:/tla:ro" -e NABU_TLA_CORPUS=/tla/train.jsonl \
+#   -e NABU_LLM_URL=http://host.docker.internal:11434/v1 -e NABU_LLM_MODEL=qwen3:4b-instruct
 
 FROM golang:1.24-bookworm AS build
 WORKDIR /src
@@ -24,15 +29,17 @@ COPY go.work ./
 COPY g2p/go.mod g2p/go.sum ./g2p/
 COPY script/go.mod script/go.sum ./script/
 COPY data/go.mod data/go.sum ./data/
+COPY translate/go.mod translate/go.sum ./translate/
 COPY tts/go.mod tts/go.sum ./tts/
 COPY api/go.mod api/go.sum ./api/
 RUN go mod download
 COPY g2p/ ./g2p/
 COPY script/ ./script/
 COPY data/ ./data/
+COPY translate/ ./translate/
 COPY tts/ ./tts/
 COPY api/ ./api/
-RUN go test ./g2p/... ./script/... ./data/... ./tts/... ./api/... \
+RUN go test ./g2p/... ./script/... ./data/... ./translate/... ./tts/... ./api/... \
  && go build -trimpath -ldflags="-s -w" -o /out/nabu-api ./api/cmd/nabu-api \
  && mkdir -p /out/lib /out/licenses \
  && cp /ort/lib/libonnxruntime.so.* /out/lib/ \

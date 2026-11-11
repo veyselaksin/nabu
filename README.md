@@ -35,7 +35,7 @@ English text
     │
     ▼
 ┌───────────────────────────────┐
-│ 1. Translation                │  LLM + LoRA + RAG
+│ 1. Translation                │  LLM + RAG (LoRA planned)
 └───────────────────────────────┘
     │  transliteration + confidence score
     ▼
@@ -57,8 +57,10 @@ English text
   .wav
 ```
 
-1. **Translation**: an LLM fine-tuned with LoRA, grounded with retrieval (RAG),
-   produces a transliteration and a confidence score.
+1. **Translation**: a local LLM, grounded with example sentences retrieved from
+   the TLA corpus (RAG), produces a transliteration. Each output word is checked
+   against the corpus, and the share found there is the confidence score.
+   LoRA fine-tuning is planned. See [translate/README.md](translate/README.md).
 2. **Script rendering**: each word gets its most frequent attested spelling from
    a corpus lexicon (TLA). Words the lexicon doesn't have are spelled sign by
    sign from the Unicode sign list and labeled as unattested. Scribes didn't
@@ -86,9 +88,9 @@ There are **no non-commercial (NC) models or weights** anywhere in the project.
 | Component           | Choice                                          | License        |
 | ------------------- | ----------------------------------------------- | -------------- |
 | Code                | Nabu                                            | Apache-2.0     |
-| Base LLM            | Qwen3 family (Apache-2.0 checkpoints only)      | Apache-2.0     |
+| Base LLM            | Qwen3 family (Apache-2.0 checkpoints only; default `qwen3:4b-instruct`) | Apache-2.0 |
 | Embeddings          | Qwen3-Embedding                                 | Apache-2.0     |
-| LLM inference       | llama.cpp                                       | MIT            |
+| LLM inference       | Ollama or llama.cpp (any OpenAI-compatible server) | MIT         |
 | TTS inference       | ONNX Runtime via onnxruntime_go                 | MIT            |
 | Vector store        | PostgreSQL + pgvector                           | PostgreSQL     |
 | HTTP router         | chi                                             | MIT            |
@@ -110,7 +112,8 @@ that download and clean the data on your machine. See
 ## Why Go?
 
 Everything that runs is Go: the G2P engine, the HTTP API, data tools, evaluation,
-and inference (llama.cpp for the LLM, onnxruntime_go for TTS). There is no Python at
+and inference (a local OpenAI-compatible server such as Ollama or llama.cpp for the
+LLM, onnxruntime_go for TTS). There is no Python at
 request time, and the G2P engine also compiles to
 WASM for the browser demo.
 
@@ -125,8 +128,9 @@ nabu/
 ├── script/              Go hieroglyph renderer + CLI (nabu-script) + signs/ (embedded sign list)
 ├── api/                 Go HTTP service
 ├── data/                Go download/build tools (nabu-data; no corpus data committed)
+├── translate/           Go translation: TLA retrieval + LLM client + CLI (nabu-translate)
 ├── eval/                Go metrics + held-out test sets
-├── translate/train/     Python LoRA fine-tuning
+├── translate/train/     Python LoRA fine-tuning (planned)
 ├── tts/                 Go TTS runtime (ONNX Runtime) + CLI (nabu-tts) + symbols.txt
 ├── tts/train/           Python VITS training + ONNX export
 └── web/                 React demo
@@ -136,9 +140,10 @@ nabu/
 
 > [!WARNING]
 > Nabu is in early development. Interfaces, rule files and output formats will
-> change without notice. G2P and hieroglyph rendering work; the speech pipeline
-> runs end to end, but no real voice has been trained yet (only a synthetic
-> smoke-test model).
+> change without notice. G2P and hieroglyph rendering work. Translation runs
+> with a general-purpose local model and is unchecked machine output. The speech
+> pipeline runs end to end, but no real voice has been trained yet (only a
+> synthetic smoke-test model).
 
 Requires Go.
 
@@ -155,6 +160,15 @@ go run ./script/cmd/nabu-script "ꜥnḫ"
 # Attested spellings: download TLA (CC BY-SA 4.0) and build a local lexicon
 make lexicon
 go run ./script/cmd/nabu-script --lexicon data/corpora/tla/lexicon-egy.tsv "ꜥnḫ"
+```
+
+English → transliteration (needs [Ollama](https://ollama.com), MIT, and the TLA corpus):
+
+```sh
+make run-llm                # in another terminal: ollama serve
+make llm-pull data-fetch    # qwen3:4b-instruct (~2.5 GB, Apache-2.0) + TLA
+make run-api                # translation is enabled when the corpus exists
+curl -X POST localhost:8080/v1/translate -d '{"text":"may the king live"}'
 ```
 
 Speech pipeline smoke test (also needs [uv](https://docs.astral.sh/uv/) and a C

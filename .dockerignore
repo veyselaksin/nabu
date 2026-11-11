@@ -4,6 +4,7 @@
 !g2p/
 !script/
 !data/
+!translate/
 # Downloaded corpora and anything built from them (e.g. the CC BY-SA TLA lexicon)
 # must never enter an image.
 data/corpora/

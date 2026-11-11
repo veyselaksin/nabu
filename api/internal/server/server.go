@@ -21,6 +21,7 @@ import (
 
 	"github.com/veyselaksin/nabu/g2p"
 	"github.com/veyselaksin/nabu/script"
+	"github.com/veyselaksin/nabu/translate"
 	"github.com/veyselaksin/nabu/tts"
 )
 
@@ -30,6 +31,19 @@ const maxBodyBytes = 64 << 10
 type Synthesizer interface {
 	Synthesize(ctx context.Context, ipa string, p tts.Params) (*tts.Audio, error)
 	Info() tts.Info
+}
+
+// Translator translates English into transliteration. *translate.Translator
+// implements it.
+type Translator interface {
+	Translate(ctx context.Context, text string) (*translate.Result, error)
+	Model() string
+}
+
+// Pinger reports whether the translator's language model server is reachable.
+// *translate.Client implements it.
+type Pinger interface {
+	Ping(ctx context.Context) error
 }
 
 // Options configures a Server.
@@ -42,6 +56,17 @@ type Options struct {
 	// Renderer enables POST /v1/render and the X-Nabu-Hieroglyphs header of
 	// /v1/speak. If nil, /v1/render returns 503.
 	Renderer *script.Renderer
+	// Translator enables POST /v1/translate. If nil, it returns 503.
+	Translator Translator
+	// TranslatorPing, if set, lets GET /v1/translator report whether the
+	// language model server is reachable.
+	TranslatorPing Pinger
+	// TranslateTimeout bounds POST /v1/translate, which runs a language model
+	// (default 3m). RequestTimeout bounds every other route.
+	TranslateTimeout time.Duration
+	// MaxTranslateRunes caps the English text accepted by /v1/translate
+	// (default 500).
+	MaxTranslateRunes int
 }
 
 // Server serves the Nabu API over a fixed set of rule sets.
@@ -63,6 +88,12 @@ func New(rulesets []*g2p.RuleSet, opts Options) (*Server, error) {
 	if opts.RequestTimeout <= 0 {
 		opts.RequestTimeout = 10 * time.Second
 	}
+	if opts.TranslateTimeout <= 0 {
+		opts.TranslateTimeout = 3 * time.Minute
+	}
+	if opts.MaxTranslateRunes <= 0 {
+		opts.MaxTranslateRunes = 500
+	}
 	s := &Server{log: opts.Logger, opts: opts, rulesets: make(map[string]*g2p.RuleSet, len(rulesets))}
 	for _, rs := range rulesets {
 		if _, dup := s.rulesets[rs.ID]; dup {
@@ -83,17 +114,22 @@ func (s *Server) Handler() http.Handler {
 	r.Use(middleware.RequestID)
 	r.Use(s.logRequests)
 	r.Use(middleware.Recoverer)
-	r.Use(middleware.Timeout(s.opts.RequestTimeout))
 
-	r.Get("/healthz", s.healthz)
-	r.Route("/v1", func(r chi.Router) {
-		r.Get("/rulesets", s.listRulesets)
-		r.Post("/g2p", s.g2p)
-		r.Post("/render", s.render)
-		r.Post("/translate", s.notImplemented("translation is not implemented yet"))
-		r.Post("/speak", s.speak)
-		r.Get("/voices", s.voices)
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.Timeout(s.opts.RequestTimeout))
+		r.Get("/healthz", s.healthz)
+		r.Route("/v1", func(r chi.Router) {
+			r.Get("/rulesets", s.listRulesets)
+			r.Post("/g2p", s.g2p)
+			r.Post("/render", s.render)
+			r.Post("/speak", s.speak)
+			r.Get("/voices", s.voices)
+			r.Get("/translator", s.translator)
+		})
 	})
+	// Translation runs a language model, which on CPU takes far longer than
+	// anything else, so it has its own timeout.
+	r.With(middleware.Timeout(s.opts.TranslateTimeout)).Post("/v1/translate", s.translate)
 	r.NotFound(func(w http.ResponseWriter, _ *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", "no such endpoint", nil)
 	})
@@ -345,6 +381,90 @@ func (s *Server) speak(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(buf.Bytes())
 }
 
+type translateRequest struct {
+	Text string `json:"text"`
+	// Lang is the target language; only "egy" (the default) is supported.
+	Lang string `json:"lang"`
+}
+
+const translateUnavailable = "translation is not configured on this server: set NABU_LLM_URL to an " +
+	"OpenAI-compatible server and NABU_TLA_CORPUS to the TLA corpus (see translate/README.md)"
+
+func (s *Server) translate(w http.ResponseWriter, r *http.Request) {
+	if s.opts.Translator == nil {
+		writeError(w, http.StatusServiceUnavailable, "translate_unavailable", translateUnavailable, nil)
+		return
+	}
+	var req translateRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if req.Lang != "" && req.Lang != "egy" {
+		writeError(w, http.StatusBadRequest, "unsupported_language",
+			fmt.Sprintf("translation into %q is not supported; supported: egy", req.Lang), nil)
+		return
+	}
+	if n := utf8.RuneCountInString(req.Text); n > s.opts.MaxTranslateRunes {
+		writeError(w, http.StatusRequestEntityTooLarge, "text_too_long",
+			fmt.Sprintf("text has %d characters; the limit for translation is %d", n, s.opts.MaxTranslateRunes), nil)
+		return
+	}
+
+	res, err := s.opts.Translator.Translate(r.Context(), req.Text)
+	var llmErr *translate.LLMError
+	switch {
+	case errors.Is(err, translate.ErrEmptyInput):
+		writeError(w, http.StatusBadRequest, "invalid_request", "text is required", nil)
+		return
+	case errors.Is(err, translate.ErrInvalidUTF8):
+		writeError(w, http.StatusBadRequest, "invalid_utf8", "text is not valid UTF-8", nil)
+		return
+	case err != nil && r.Context().Err() != nil:
+		writeError(w, http.StatusGatewayTimeout, "timeout",
+			"the language model took too long (NABU_TRANSLATE_TIMEOUT)", nil)
+		return
+	case errors.Is(err, translate.ErrModelOutput):
+		s.log.WarnContext(r.Context(), "unusable model output", "err", err)
+		writeError(w, http.StatusBadGateway, "bad_model_output", err.Error(), nil)
+		return
+	case errors.As(err, &llmErr):
+		s.log.ErrorContext(r.Context(), "language model request failed", "err", err)
+		writeError(w, http.StatusBadGateway, "llm_unavailable", llmErr.Error(), nil)
+		return
+	case err != nil:
+		s.log.ErrorContext(r.Context(), "translate failed", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal", "internal error", nil)
+		return
+	}
+	writeJSON(w, http.StatusOK, res)
+}
+
+type translatorResponse struct {
+	Available bool   `json:"available"`
+	Message   string `json:"message,omitempty"`
+	Model     string `json:"model,omitempty"`
+}
+
+// translator reports whether POST /v1/translate can work right now: it is
+// configured and, when it can be checked, its model server answers.
+func (s *Server) translator(w http.ResponseWriter, r *http.Request) {
+	if s.opts.Translator == nil {
+		writeJSON(w, http.StatusOK, translatorResponse{Message: translateUnavailable})
+		return
+	}
+	model := s.opts.Translator.Model()
+	if s.opts.TranslatorPing != nil {
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		if err := s.opts.TranslatorPing.Ping(ctx); err != nil {
+			writeJSON(w, http.StatusOK, translatorResponse{Model: model,
+				Message: "the language model server is not responding (" + err.Error() + "); start it, e.g. make run-llm"})
+			return
+		}
+	}
+	writeJSON(w, http.StatusOK, translatorResponse{Available: true, Model: model})
+}
+
 type voicesResponse struct {
 	Available bool        `json:"available"`
 	Message   string      `json:"message,omitempty"`
@@ -372,12 +492,6 @@ func (s *Server) voices(w http.ResponseWriter, _ *http.Request) {
 		Name: info.Name, SampleRate: info.SampleRate, Languages: info.Languages, Speakers: info.Speakers,
 		MinSpeed: tts.MinSpeed, MaxSpeed: tts.MaxSpeed,
 	}})
-}
-
-func (s *Server) notImplemented(msg string) http.HandlerFunc {
-	return func(w http.ResponseWriter, _ *http.Request) {
-		writeError(w, http.StatusNotImplemented, "not_implemented", msg, nil)
-	}
 }
 
 // decodeJSON decodes a single JSON object from the body into dst, writing a

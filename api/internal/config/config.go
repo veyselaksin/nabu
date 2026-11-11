@@ -38,20 +38,40 @@ type Config struct {
 	// TTSThreads limits ONNX Runtime threads per request (0 = ORT default).
 	// Env: NABU_TTS_THREADS.
 	TTSThreads int
+	// LLMURL is the root of an OpenAI-compatible chat-completions API (for
+	// example llama.cpp's llama-server at http://127.0.0.1:8090/v1). If empty,
+	// translation is disabled and /v1/translate returns 503. Env: NABU_LLM_URL.
+	LLMURL string
+	// LLMModel is the model name sent to that server. Env: NABU_LLM_MODEL.
+	LLMModel string
+	// LLMAPIKey is sent as a bearer token if set. Env: NABU_LLM_API_KEY.
+	LLMAPIKey string
+	// TLACorpus is the TLA train.jsonl downloaded by `nabu-data fetch tla`,
+	// used for retrieval and the vocabulary check. Required with LLMURL.
+	// Env: NABU_TLA_CORPUS.
+	TLACorpus string
+	// TranslateTimeout bounds POST /v1/translate. Env: NABU_TRANSLATE_TIMEOUT
+	// (default 3m: a language model on CPU is slow).
+	TranslateTimeout time.Duration
 }
 
 // FromEnv builds a Config from getenv (normally os.Getenv).
 func FromEnv(getenv func(string) string) (Config, error) {
 	c := Config{
-		Addr:           ":8080",
-		RulesDir:       strings.TrimSpace(getenv("NABU_RULES_DIR")),
-		TTSModel:       strings.TrimSpace(getenv("NABU_TTS_MODEL")),
-		ORTLibrary:     strings.TrimSpace(getenv("NABU_ORT_LIB")),
-		Lexicon:        strings.TrimSpace(getenv("NABU_LEXICON")),
-		LogLevel:       slog.LevelInfo,
-		LogFormat:      "json",
-		MaxTextRunes:   2000,
-		RequestTimeout: 10 * time.Second,
+		Addr:             ":8080",
+		RulesDir:         strings.TrimSpace(getenv("NABU_RULES_DIR")),
+		TTSModel:         strings.TrimSpace(getenv("NABU_TTS_MODEL")),
+		ORTLibrary:       strings.TrimSpace(getenv("NABU_ORT_LIB")),
+		Lexicon:          strings.TrimSpace(getenv("NABU_LEXICON")),
+		LLMURL:           strings.TrimSpace(getenv("NABU_LLM_URL")),
+		LLMModel:         strings.TrimSpace(getenv("NABU_LLM_MODEL")),
+		LLMAPIKey:        strings.TrimSpace(getenv("NABU_LLM_API_KEY")),
+		TLACorpus:        strings.TrimSpace(getenv("NABU_TLA_CORPUS")),
+		TranslateTimeout: 3 * time.Minute,
+		LogLevel:         slog.LevelInfo,
+		LogFormat:        "json",
+		MaxTextRunes:     2000,
+		RequestTimeout:   10 * time.Second,
 	}
 	if v := getenv("NABU_ADDR"); v != "" {
 		c.Addr = v
@@ -80,6 +100,16 @@ func FromEnv(getenv func(string) string) (Config, error) {
 			return c, fmt.Errorf("NABU_REQUEST_TIMEOUT: must be a positive duration such as 10s, got %q", v)
 		}
 		c.RequestTimeout = d
+	}
+	if v := getenv("NABU_TRANSLATE_TIMEOUT"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil || d <= 0 {
+			return c, fmt.Errorf("NABU_TRANSLATE_TIMEOUT: must be a positive duration such as 3m, got %q", v)
+		}
+		c.TranslateTimeout = d
+	}
+	if c.LLMURL != "" && c.TLACorpus == "" {
+		return c, fmt.Errorf("NABU_TLA_CORPUS must be set when NABU_LLM_URL is set (run: make data-fetch)")
 	}
 	if v := getenv("NABU_TTS_THREADS"); v != "" {
 		n, err := strconv.Atoi(v)

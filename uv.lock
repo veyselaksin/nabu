@@ -23,7 +23,6 @@ resolution-markers = [
 [manifest]
 members = [
     "nabu-eval",
-    "nabu-translate",
     "nabu-tts",
     "nabu-workspace",
 ]
@@ -1059,11 +1058,6 @@ version = "0.0.0"
 source = { editable = "eval" }
 
 [[package]]
-name = "nabu-translate"
-version = "0.0.0"
-source = { editable = "translate" }
-
-[[package]]
 name = "nabu-tts"
 version = "0.1.0"
 source = { editable = "tts/train" }
@@ -1120,7 +1114,6 @@ version = "0.0.0"
 source = { virtual = "." }
 dependencies = [
     { name = "nabu-eval" },
-    { name = "nabu-translate" },
     { name = "nabu-tts" },
 ]
 
@@ -1133,7 +1126,6 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "nabu-eval", editable = "eval" },
-    { name = "nabu-translate", editable = "translate" },
     { name = "nabu-tts", editable = "tts/train" },
 ]
 

@@ -18,6 +18,7 @@ import (
 	"github.com/veyselaksin/nabu/g2p"
 	"github.com/veyselaksin/nabu/g2p/rules"
 	"github.com/veyselaksin/nabu/script"
+	"github.com/veyselaksin/nabu/translate"
 	"github.com/veyselaksin/nabu/tts"
 )
 
@@ -99,6 +100,28 @@ func run() error {
 		return fmt.Errorf("loading hieroglyph sign list: %w", err)
 	}
 
+	opts.TranslateTimeout = cfg.TranslateTimeout
+	if cfg.LLMURL != "" {
+		index, err := translate.LoadIndex(cfg.TLACorpus)
+		if err != nil {
+			return fmt.Errorf("loading TLA corpus (NABU_TLA_CORPUS): %w", err)
+		}
+		client := &translate.Client{BaseURL: cfg.LLMURL, Model: cfg.LLMModel, APIKey: cfg.LLMAPIKey,
+			HTTP: &http.Client{}}
+		opts.Translator = translate.New(client, index, translate.Options{})
+		opts.TranslatorPing = client
+		log.Info("translation enabled", "llm_url", cfg.LLMURL, "model", cfg.LLMModel,
+			"examples", index.Len(), "forms", index.Forms(), "corpus", cfg.TLACorpus)
+		// The model server may start later; report it without failing.
+		pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		if err := client.Ping(pingCtx); err != nil {
+			log.Warn("language model server not reachable yet; /v1/translate will fail until it is", "err", err)
+		}
+		cancel()
+	} else {
+		log.Info("translation disabled: NABU_LLM_URL is not set; POST /v1/translate will return 503")
+	}
+
 	srv, err := server.New(sets, opts)
 	if err != nil {
 		return err
@@ -109,7 +132,7 @@ func run() error {
 		Handler:           srv.Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
-		WriteTimeout:      cfg.RequestTimeout + 5*time.Second,
+		WriteTimeout:      max(cfg.RequestTimeout, cfg.TranslateTimeout) + 5*time.Second,
 		IdleTimeout:       60 * time.Second,
 		ErrorLog:          slog.NewLogLogger(handler, slog.LevelWarn),
 	}

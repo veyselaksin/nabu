@@ -23,13 +23,13 @@ jobs:
           cache-dependency-path: "**/go.sum"
       - name: gofmt
         run: |
-          out=$(gofmt -l g2p script data tts api)
+          out=$(gofmt -l g2p script data translate tts api)
           if [ -n "$out" ]; then echo "::error::gofmt needed:"; echo "$out"; exit 1; fi
       - name: go vet
-        run: go vet ./g2p/... ./script/... ./data/... ./tts/... ./api/...
+        run: go vet ./g2p/... ./script/... ./data/... ./translate/... ./tts/... ./api/...
       # tts.TestModelIntegration is skipped here (no model); the tts job runs it.
       - name: go test
-        run: go test -race ./g2p/... ./script/... ./data/... ./tts/... ./api/...
+        run: go test -race ./g2p/... ./script/... ./data/... ./translate/... ./tts/... ./api/...
       - name: g2p and script build for WASM
         run: GOOS=js GOARCH=wasm go build ./g2p/... ./script/...
       - name: modules are tidy
@@ -37,6 +37,7 @@ jobs:
           (cd g2p && go mod tidy -diff)
           (cd script && go mod tidy -diff)
           (cd data && go mod tidy -diff)
+          (cd translate && go mod tidy -diff)
           (cd tts && go mod tidy -diff)
           (cd api && go mod tidy -diff)
 
@@ -111,6 +112,8 @@ jobs:
           cache-dependency-path: "**/go.sum"
       - run: go run ./data/cmd/nabu-data fetch unikemet tla
       - run: go test -count=1 -run Reproducible -v ./data/cmd/nabu-data
+      # Retrieval and the CLI against the real corpus (the model is faked).
+      - run: go test -count=1 -v ./translate/cmd/nabu-translate
 
   docker:
     runs-on: ubuntu-latest

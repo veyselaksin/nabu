@@ -9,7 +9,7 @@ Requirements: Go ≥ 1.24 with a C compiler (cgo, for the ONNX Runtime binding i
 `tts/`), [uv](https://docs.astral.sh/uv/), Node.js ≥ 22. No GPU is needed.
 
 ```sh
-uv sync                 # Python workspace (translate, tts, eval) + ruff/pytest
+uv sync                 # Python workspace (tts, eval) + ruff/pytest
 make test               # go test + pytest
 make lint               # gofmt, go vet, WASM build check, ruff, tsc
 make run-api            # API on http://localhost:8080

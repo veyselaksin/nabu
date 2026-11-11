@@ -23,6 +23,10 @@ import (
 type Sentence struct {
 	Hieroglyphs     string `json:"hieroglyphs"`
 	Transliteration string `json:"transliteration"`
+	// Translation is the editors' translation, in German.
+	Translation   string `json:"translation"`
+	DateNotBefore string `json:"dateNotBefore"`
+	DateNotAfter  string `json:"dateNotAfter"`
 }
 
 // Read parses a JSON-lines file of sentences.
