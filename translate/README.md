@@ -28,9 +28,17 @@ request runs in these steps:
    Egyptian are retrieved (stage "earlier", or undated AES texts; not Late
    Egyptian or Demotic), and no Coptic dictionary entries. The two sentence
    rankings are merged by reciprocal-rank fusion (RRF, k = 60). The 8 best
-   sentences become examples, and the 10 nearest dictionary entries (AED:
-   lemma, English and German meaning) become a glossary. Sentences of more
-   than 40 words are not retrieved.
+   sentences become examples. Sentences of more than 40 words are not
+   retrieved.
+
+   The glossary (10 or more dictionary entries: lemma, English and German
+   meaning) is built in two ways. First, every word of the text, every pair
+   of adjacent words and every German keyword is looked up among the
+   dictionary glosses: an entry matches when one of its glosses is exactly
+   that word ("live" finds `ꜥnḫ: to live; to be alive`, not the title
+   `ḥqꜣ-ꜥnḫ.w`). Entries sharing a gloss are ranked by how often the lemma
+   occurs in the lemmatized TLA, and at most 2 are kept per word. The
+   remaining places, at least 3, go to the entries nearest by embedding.
 3. The model translates the English text, with the glossary, the examples
    (German translation → transliteration, the editor's brackets removed) and
    the corpus alphabet: every grapheme (a letter with its combining marks, so
@@ -42,11 +50,45 @@ request runs in these steps:
    such words (`corrected` in the response). Words that remain list their
    graphemes in `foreign`: the script and G2P stages would reject them.
 
-Every output word is then looked up among the transliterated forms of the TLA
-and, with the vector index, of every retrievable corpus sentence.
-**Confidence** is the share of output words found there. It is a vocabulary
-check only. A sentence made of real words can still be ungrammatical or mean
-something else.
+Every output word is then checked, and the response says for each one:
+
+- `gloss`: what the word means according to the dictionary, through the
+  lemma the TLA most often analyses that form as. This is independent of
+  what the model intended, so a wrong word shows up as a wrong meaning.
+- `evidence`: `dictionary` (its lemma is an entry matched to a word of the
+  input), `example` (it occurs in a retrieved example), `corpus` (it occurs
+  somewhere in the corpus) or `none`.
+- `attested`, `count`, `foreign`: whether and how often the form occurs in
+  the corpus, and graphemes the corpus never writes.
+
+`coverage` lists each content word of the input and the output words whose
+dictionary entry has it as a gloss. A word that is not matched may be
+missing from the translation, or translated by a lemma that only has a
+German gloss (about half of the AED entries have no English).
+
+**Confidence** is the share of output words with `dictionary` or `example`
+evidence, times the share of input words matched in `coverage`. It measures
+support, not correctness: grammar and word order are not checked.
+`attested_share` is the plain vocabulary check.
+
+### Measuring dictionary retrieval
+
+```sh
+nabu-translate eval-glossary --build <data>/wiktionary-egy/kaikki.org-dictionary-Egyptian.jsonl
+nabu-translate eval-glossary --mode similar   # vector search only, for comparison
+```
+
+`--build` derives a query set from English Wiktionary's Egyptian entries
+(first gloss → headword, for lemmas that occur at least 20 times in the
+TLA) and stores it under the data root; it is CC BY-SA and stays local.
+Nobody has reviewed the pairs, and some differ from the AED only by
+convention, so read the numbers as a comparison between settings. On the
+112 queries built on 2026-11-16, with `qwen3-embedding:0.6b`:
+
+| Glossary | recall@1 | recall@5 | recall@10 | MRR |
+| --- | ---: | ---: | ---: | ---: |
+| vector search only | 28.6% | 63.4% | 79.5% | 0.439 |
+| exact lookup + vector search | 67.0% | 82.1% | 88.4% | 0.739 |
 
 Responses include the examples and glossary entries with their record IDs and
 sources (`tla:…`, `aes:…`, `aed:…`), the German search terms, and `retrieval`:
