@@ -19,8 +19,10 @@ import (
 	"github.com/veyselaksin/nabu/data/aed"
 	"github.com/veyselaksin/nabu/data/aes"
 	"github.com/veyselaksin/nabu/data/coptic"
+	"github.com/veyselaksin/nabu/data/oraec"
 	"github.com/veyselaksin/nabu/data/source"
 	"github.com/veyselaksin/nabu/data/tla"
+	"github.com/veyselaksin/nabu/data/wiktionary"
 )
 
 // Language stages.
@@ -63,18 +65,57 @@ type LexEntry struct {
 	French   string   `json:"fr,omitempty"`
 	POS      string   `json:"pos,omitempty"`
 	Dialects []string `json:"dialects,omitempty"`
+	// EnglishSource names the source of English when it is not the entry's
+	// own source (an AED entry whose English gloss comes from Wiktionary).
+	EnglishSource string `json:"en_source,omitempty"`
+	// Pronunciations are labeled IPA transcriptions from other sources.
+	Pronunciations []Pronunciation `json:"pronunciations,omitempty"`
+	// Coptic lists the Coptic words this Egyptian lemma survives as.
+	Coptic []CopticForm `json:"coptic,omitempty"`
+}
+
+// Pronunciation is one IPA transcription with the label its source gives it
+// ("modern Egyptological", "Middle Egyptian, c. 1700 BCE", …). Readings
+// labeled with a stage are reconstructions, not attested sounds.
+type Pronunciation struct {
+	Label  string `json:"label"`
+	IPA    string `json:"ipa"`
+	Source string `json:"source"`
+}
+
+// CopticForm is a Coptic descendant of an Egyptian lemma: evidence for its
+// vowels, since Coptic writes them.
+type CopticForm struct {
+	ID       string   `json:"id"` // lexicon ID, "coptic-dict:C1494"
+	Lemma    string   `json:"lemma"`
+	Dialects []string `json:"dialects,omitempty"`
+	Source   string   `json:"source"` // who made the link
+}
+
+// LexStats summarizes the lexicon entries of one source (a data-quality
+// report: what share of them can be looked up in which way).
+type LexStats struct {
+	Entries           int `json:"entries"`
+	WithEnglish       int `json:"with_english"`
+	EnglishBorrowed   int `json:"english_from_other_source"`
+	WithGerman        int `json:"with_german"`
+	WithPronunciation int `json:"with_pronunciation"`
+	WithCoptic        int `json:"with_coptic"`
+	NoGloss           int `json:"no_gloss"`
 }
 
 // Manifest records what a build read and wrote.
 type Manifest struct {
-	Built      time.Time         `json:"built"`
-	Sources    []ManifestSource  `json:"sources"`
-	Sentences  int               `json:"sentences"`
-	Lexicon    int               `json:"lexicon"`
-	Duplicates map[string]int    `json:"duplicates_dropped"`
-	Skipped    map[string]int    `json:"skipped"`
-	Stages     map[string]int    `json:"sentences_by_stage"`
-	Files      map[string]string `json:"files"`
+	Built      time.Time        `json:"built"`
+	Sources    []ManifestSource `json:"sources"`
+	Sentences  int              `json:"sentences"`
+	Lexicon    int              `json:"lexicon"`
+	Duplicates map[string]int   `json:"duplicates_dropped"`
+	Skipped    map[string]int   `json:"skipped"`
+	Stages     map[string]int   `json:"sentences_by_stage"`
+	// LexiconStats is keyed by source.
+	LexiconStats map[string]LexStats `json:"lexicon_by_source"`
+	Files        map[string]string   `json:"files"`
 }
 
 // ManifestSource is one input source with its license and pinned files.
@@ -196,6 +237,37 @@ func Build(dataDir string) (*Corpus, error) {
 	if err := c.addCoptic(filepath.Join(dataDir, "coptic-dict", "Comprehensive_Coptic_Lexicon-v1.2-2020.xml")); err != nil {
 		return nil, err
 	}
+	if err := c.addWiktionary(filepath.Join(dataDir, "wiktionary-egy", "kaikki.org-dictionary-Egyptian.jsonl")); err != nil {
+		return nil, err
+	}
+	if err := c.addEtymologies(filepath.Join(dataDir, "oraec-coptic-etymologies",
+		"digitizing_coptic_etymologies_coptic_list_entries.csv")); err != nil {
+		return nil, err
+	}
+	c.Manifest.LexiconStats = map[string]LexStats{}
+	for _, e := range c.Lexicon {
+		st := c.Manifest.LexiconStats[e.Source]
+		st.Entries++
+		if e.English != "" {
+			st.WithEnglish++
+		}
+		if e.EnglishSource != "" {
+			st.EnglishBorrowed++
+		}
+		if e.German != "" {
+			st.WithGerman++
+		}
+		if e.English == "" && e.German == "" && e.French == "" {
+			st.NoGloss++
+		}
+		if len(e.Pronunciations) > 0 {
+			st.WithPronunciation++
+		}
+		if len(e.Coptic) > 0 {
+			st.WithCoptic++
+		}
+		c.Manifest.LexiconStats[e.Source] = st
+	}
 
 	for _, s := range c.Sentences {
 		c.Manifest.Stages[stageName(s.Stage)]++
@@ -242,6 +314,135 @@ func (c *Corpus) addCoptic(path string) error {
 		})
 	}
 	c.Manifest.Sources = append(c.Manifest.Sources, manifestSource("coptic-dict", len(entries)))
+	return nil
+}
+
+// wiktPOS maps Wiktionary parts of speech to the AED's word classes (the
+// part of an AED part of speech before the colon).
+var wiktPOS = map[string]string{
+	"noun": "substantive", "verb": "verb", "name": "entity_name", "adj": "adjective", "prep": "preposition",
+	"adv": "adverb", "pron": "pronoun", "particle": "particle", "num": "numeral", "intj": "interjection",
+}
+
+// MatchKey reduces a transliterated lemma to a form in which the TLA/AED
+// and Wiktionary conventions agree: yod as j, weak consonants spelled out,
+// no separators. It loses distinctions, so a match on it is only a
+// candidate.
+func MatchKey(lemma string) string {
+	s := norm.NFC.String(strings.ToLower(lemma))
+	return strings.NewReplacer("i̯", "j", "ꞽ", "j", "ı͗", "j", "u̯", "w", ".", "", "-", "", "ʾ", "", "=", "", " ", "").Replace(s)
+}
+
+// maxBorrowedSenses caps how many Wiktionary senses become an entry's
+// English gloss, so that one entry does not crowd a prompt.
+const maxBorrowedSenses = 5
+
+// isAffix reports whether a lemma is a clitic or an ending ("=f", ".kw"):
+// MatchKey drops the mark that tells these apart, so they are never joined.
+func isAffix(lemma string) bool {
+	return strings.HasPrefix(lemma, "=") || strings.HasPrefix(lemma, ".") || strings.HasPrefix(lemma, "-")
+}
+
+// addWiktionary joins Wiktionary's Egyptian entries to AED entries and
+// copies over what the AED lacks: an English gloss where it has none, and
+// the labeled pronunciations. Egyptian is full of homonyms and the two
+// sources number them differently, so an entry is joined only when it is
+// the only AED word and the only Wiktionary word with that spelling and
+// word class. AED "root" entries are not words and are left alone.
+func (c *Corpus) addWiktionary(path string) error {
+	const key = "wiktionary-egy"
+	f, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("corpus: %w (run: nabu-data fetch %s)", err, key)
+	}
+	defer f.Close()
+	entries, err := wiktionary.Read(f)
+	if err != nil {
+		return err
+	}
+	type class struct{ key, pos string }
+	aedBy := map[class][]int{}
+	for i, e := range c.Lexicon {
+		pos, _, _ := strings.Cut(e.POS, ":")
+		if e.Source != "aed" || pos == "root" || pos == "" || isAffix(e.Lemma) {
+			continue
+		}
+		k := class{MatchKey(e.Lemma), pos}
+		aedBy[k] = append(aedBy[k], i)
+	}
+	wikBy := map[class][]int{}
+	for i, e := range entries {
+		if pos := wiktPOS[e.POS]; pos != "" && !isAffix(e.Word) {
+			k := class{MatchKey(e.Word), pos}
+			wikBy[k] = append(wikBy[k], i)
+		}
+	}
+	joined := 0
+	for k, ws := range wikBy {
+		as := aedBy[k]
+		if len(as) == 0 {
+			c.Manifest.Skipped[key+":no AED entry"] += len(ws)
+			continue
+		}
+		if len(as) != 1 || len(ws) != 1 {
+			c.Manifest.Skipped[key+":homonyms"] += len(ws)
+			continue
+		}
+		e, w := &c.Lexicon[as[0]], entries[ws[0]]
+		joined++
+		if e.English == "" {
+			// Wiktionary lists every sense; the first few are the common ones.
+			e.English, e.EnglishSource = cleanText(strings.Join(w.Glosses[:min(len(w.Glosses), maxBorrowedSenses)], "; ")), key
+		}
+		for _, p := range w.Pronunciations {
+			e.Pronunciations = append(e.Pronunciations, Pronunciation{Label: p.Label, IPA: p.IPA, Source: key})
+		}
+	}
+	c.Manifest.Skipped[key+":not a joinable word class"] = len(entries) - func() (n int) {
+		for _, ws := range wikBy {
+			n += len(ws)
+		}
+		return n
+	}()
+	c.Manifest.Sources = append(c.Manifest.Sources, manifestSource(key, joined))
+	return nil
+}
+
+// addEtymologies records, on each Egyptian lemma, the Coptic words that
+// ORAEC's etymology list derives from it.
+func (c *Corpus) addEtymologies(path string) error {
+	const key = "oraec-coptic-etymologies"
+	f, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("corpus: %w (run: nabu-data fetch %s)", err, key)
+	}
+	defer f.Close()
+	links, err := oraec.ReadEtymologies(f)
+	if err != nil {
+		return err
+	}
+	byID := make(map[string]int, len(c.Lexicon))
+	for i, e := range c.Lexicon {
+		byID[e.ID] = i
+	}
+	n := 0
+	for _, l := range links {
+		if l.Egyptian == "" {
+			c.Manifest.Skipped[key+":no Egyptian lemma"]++
+			continue
+		}
+		ei, ok1 := byID["aed:"+l.Egyptian]
+		ci, ok2 := byID["coptic-dict:"+l.Coptic]
+		if !ok1 || !ok2 {
+			c.Manifest.Skipped[key+":unknown lemma ID"]++
+			continue
+		}
+		cop := c.Lexicon[ci]
+		c.Lexicon[ei].Coptic = append(c.Lexicon[ei].Coptic,
+			CopticForm{ID: cop.ID, Lemma: cop.Lemma, Dialects: cop.Dialects, Source: key})
+		n++
+	}
+	c.Manifest.Sources = append(c.Manifest.Sources, manifestSource(key, n))
 	return nil
 }
 

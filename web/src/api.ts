@@ -201,6 +201,8 @@ export interface GlossaryEntry {
   source: string;
   lemma: string;
   en?: string;
+  /** Where `en` comes from when it is not `source` (e.g. "wiktionary-egy"). */
+  en_source?: string;
   de?: string;
   pos?: string;
   score: number;

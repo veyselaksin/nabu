@@ -205,6 +205,40 @@ var registry = []Source{
 		}},
 	},
 	{
+		Key:        "wiktionary-egy",
+		Name:       "English Wiktionary, Egyptian entries (Wiktextract, kaikki.org)",
+		Homepage:   "https://kaikki.org/dictionary/Egyptian/",
+		License:    "CC-BY-SA-4.0",
+		LicenseURL: "https://creativecommons.org/licenses/by-sa/4.0/",
+		ShareAlike: ptr(true),
+		Attribution: "Wiktionary contributors, English Wiktionary (https://en.wiktionary.org), Egyptian entries, " +
+			"extracted with Wiktextract (Tatu Ylonen, LREC 2022) and published at https://kaikki.org. CC BY-SA 4.0 (also GFDL).",
+		Notes: "Community-edited: English glosses and labeled IPA (\"modern Egyptological\" readings and dated " +
+			"reconstructions). kaikki.org regenerates this file, so the checksum pins the copy read on 2026-11-16; " +
+			"when it changes, review and update the pin.",
+		Files: []File{{
+			Name:   "kaikki.org-dictionary-Egyptian.jsonl",
+			URL:    "https://kaikki.org/dictionary/Egyptian/kaikki.org-dictionary-Egyptian.jsonl",
+			SHA256: "35a76e6e141d4f39b474aa53fe192dad7c9b785e512bb552dd5cef6231daa1a9",
+		}},
+	},
+	{
+		Key:         "oraec-coptic-etymologies",
+		Name:        "ORAEC: Coptic etymologies (Coptic lemma → Egyptian and Demotic lemma IDs)",
+		Homepage:    "https://github.com/oraec/coptic_etymologies",
+		License:     "CC0-1.0",
+		LicenseURL:  "https://creativecommons.org/publicdomain/zero/1.0/",
+		ShareAlike:  ptr(false),
+		Attribution: "ORAEC, Digitizing Coptic Etymologies (https://github.com/oraec/coptic_etymologies). CC0 1.0.",
+		Notes:       "Links Coptic Dictionary Online IDs to AED/TLA lemma IDs. No source is cited per link.",
+		Files: []File{{
+			Name: "digitizing_coptic_etymologies_coptic_list_entries.csv",
+			URL: "https://raw.githubusercontent.com/oraec/coptic_etymologies/95d6316ab7bf65f8b594d94991f72125866ad843/" +
+				"digitizing_coptic_etymologies_coptic_list_entries.csv",
+			SHA256: "455bea27cc81b73f329235580e320514b67bf43e46bd9b936511cbfbf0e66f58",
+		}},
+	},
+	{
 		Key:      "oracc",
 		Name:     "ORACC: Open Richly Annotated Cuneiform Corpus (Sumerian)",
 		Homepage: "https://oracc.museum.upenn.edu/",

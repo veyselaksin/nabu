@@ -183,13 +183,15 @@ type Coverage struct {
 
 // Gloss is a dictionary entry given to the model.
 type Gloss struct {
-	ID      string  `json:"id"`
-	Source  string  `json:"source"`
-	Lemma   string  `json:"lemma"`
-	English string  `json:"en,omitempty"`
-	German  string  `json:"de,omitempty"`
-	POS     string  `json:"pos,omitempty"`
-	Score   float64 `json:"score"`
+	ID      string `json:"id"`
+	Source  string `json:"source"`
+	Lemma   string `json:"lemma"`
+	English string `json:"en,omitempty"`
+	// EnglishSource names where English comes from when it is not Source.
+	EnglishSource string  `json:"en_source,omitempty"`
+	German        string  `json:"de,omitempty"`
+	POS           string  `json:"pos,omitempty"`
+	Score         float64 `json:"score"`
 	// Match is "exact" (Term, a word of the input, equals one of the
 	// entry's glosses) or "similar" (nearest by embedding).
 	Match string `json:"match,omitempty"`
@@ -518,7 +520,7 @@ func (t *Translator) retrieveVector(q []float32, text string, keywords []string,
 		if aed, ok := strings.CutPrefix(e.ID, "aed:"); ok {
 			n = t.index.LemmaCount(aed)
 		}
-		glossary = append(glossary, Gloss{ID: e.ID, Source: e.Source, Lemma: e.Translit, English: e.English,
+		glossary = append(glossary, Gloss{ID: e.ID, Source: e.Source, Lemma: e.Translit, English: e.English, EnglishSource: e.EnglishSource,
 			German: e.German, POS: e.POS, Score: e.Score, Match: MatchSimilar, Count: n})
 	}
 	return fuse(bm25, sentences, k), glossary
@@ -581,6 +583,7 @@ func usedSources(hits []Hit, glossary []Gloss) []script.Source {
 	}
 	for _, g := range glossary {
 		add(g.Source)
+		add(g.EnglishSource)
 	}
 	out := make([]script.Source, len(keys))
 	for i, k := range keys {

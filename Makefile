@@ -159,7 +159,7 @@ lexicon: data-fetch ## Build the TLA spelling lexicon into $(LEXICON) (CC BY-SA 
 	$(GO) run ./data/cmd/nabu-data build-lexicon --out "$(LEXICON)"
 
 corpus-fetch: ## Download every Egyptian corpus source (TLA x3, AES, AED, Coptic lexicon; ~400 MB, CC BY-SA 4.0)
-	$(GO) run ./data/cmd/nabu-data fetch tla tla-late tla-demotic aes aed coptic-dict
+	$(GO) run ./data/cmd/nabu-data fetch tla tla-late tla-demotic aes aed coptic-dict wiktionary-egy oraec-coptic-etymologies
 
 corpus: corpus-fetch ## Merge all sources into $(CORPUS)/{sentences,lexicon}.jsonl (CC BY-SA 4.0; never commit it)
 	$(GO) run ./data/cmd/nabu-data build-corpus --out "$(CORPUS)"

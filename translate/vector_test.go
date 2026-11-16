@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -125,5 +126,70 @@ func TestEmbedText(t *testing.T) {
 	}
 	if !strings.HasPrefix(QueryText("hi"), "Instruct: ") || !strings.HasSuffix(QueryText("hi"), "\nQuery: hi") {
 		t.Error(QueryText("hi"))
+	}
+}
+
+func TestBuildVectorsReusesFinishedIndex(t *testing.T) {
+	dir := t.TempDir()
+	docs := testDocs()
+	opts := BuildOptions{Model: "fake", Dims: 4, Batch: 2}
+	if err := BuildVectors(context.Background(), &fakeEmbedder{}, docs, dir, opts); err != nil {
+		t.Fatal(err)
+	}
+	before, err := LoadVectors(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// One document changes its text, one is new; the rest keep their vectors.
+	changed := append([]Doc(nil), docs...)
+	changed[1].German += " Bier"
+	changed = append(changed, Doc{ID: "new", Kind: KindLexicon, Source: "aed", Translit: "tꞽ", English: "bread", German: "Brot"})
+	// The first attempt dies after one request; the rerun must still reuse.
+	emb := &fakeEmbedder{failAfter: 1}
+	if err := BuildVectors(context.Background(), emb, changed, dir, opts); err == nil {
+		t.Fatal("want an error from the interrupted rebuild")
+	}
+	emb2 := &fakeEmbedder{}
+	if err := BuildVectors(context.Background(), emb2, changed, dir, opts); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]bool{changed[1].embedText(): true, changed[len(changed)-1].embedText(): true}
+	for _, text := range append(emb.texts, emb2.texts...) {
+		if !want[text] {
+			t.Errorf("embedded again: %q", text)
+		}
+		delete(want, text)
+	}
+	if len(want) != 0 {
+		t.Errorf("not embedded: %v", want)
+	}
+	after, err := LoadVectors(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(after.docs) != len(changed) {
+		t.Fatalf("docs = %d, want %d", len(after.docs), len(changed))
+	}
+	for i := range docs {
+		if i == 1 {
+			continue
+		}
+		if !reflect.DeepEqual(before.vecs[i*4:(i+1)*4], after.vecs[i*4:(i+1)*4]) {
+			t.Errorf("vector of %s changed", docs[i].ID)
+		}
+	}
+	left, _ := filepath.Glob(filepath.Join(dir, "prev-*"))
+	if len(left) != 0 {
+		t.Errorf("left over: %v", left)
+	}
+
+	// Another model: nothing is reused.
+	emb3 := &fakeEmbedder{}
+	if err := BuildVectors(context.Background(), emb3, changed, dir, BuildOptions{Model: "other", Dims: 4}); err != nil {
+		t.Fatal(err)
+	}
+	if len(emb3.texts) != len(changed) {
+		t.Errorf("other model embedded %d texts, want %d", len(emb3.texts), len(changed))
 	}
 }

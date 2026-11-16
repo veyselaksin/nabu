@@ -29,14 +29,36 @@ func TestBuild(t *testing.T) {
 	if m.Duplicates["tla"] != 1 || m.Duplicates["aes"] != 1 || m.Skipped["tla"] != 1 || m.Skipped["aes"] != 1 {
 		t.Errorf("duplicates %v, skipped %v", m.Duplicates, m.Skipped)
 	}
-	if m.Stages["earlier"] != 1 || m.Stages["unknown"] != 1 || len(m.Sources) != 6 || m.Sources[0].License != "CC-BY-SA-4.0" {
+	if m.Stages["earlier"] != 1 || m.Stages["unknown"] != 1 || len(m.Sources) != 8 || m.Sources[0].License != "CC-BY-SA-4.0" {
 		t.Errorf("manifest = %+v", m)
 	}
-	if len(c.Lexicon) != 5 || !reflect.DeepEqual(c.Lexicon[0], LexEntry{ID: "aed:10050", Source: "aed", Lemma: "=f",
+	if len(c.Lexicon) != 9 || !reflect.DeepEqual(c.Lexicon[0], LexEntry{ID: "aed:10050", Source: "aed", Lemma: "=f",
 		German: "[Suffix Pron. sg.3.m.]", English: "he; him; his (suffix pron., 3rd. per. masc. sing.)", POS: "pronoun: personal_pronoun"}) {
 		t.Errorf("Lexicon = %+v", c.Lexicon)
 	}
-	if e := c.Lexicon[3]; e.Source != "coptic-dict" || e.Stage != Coptic || e.English != "one" || e.French != "un" {
+	give := LexEntry{ID: "aed:851711", Source: "aed", Lemma: "rḏi̯", German: "geben; veranlassen", English: "to give; to cause",
+		POS: "verb: verb_irr", EnglishSource: "wiktionary-egy",
+		Pronunciations: []Pronunciation{
+			{Label: "Middle Egyptian, c. 1700 BCE", IPA: "/(ɾV)ˈtʼiːjiʔ/", Source: "wiktionary-egy"},
+			{Label: "modern Egyptological", IPA: "/rɛd͡ʒi/", Source: "wiktionary-egy"}},
+		Coptic: []CopticForm{{ID: "coptic-dict:C9", Lemma: "ⲁⲗⲟⲩ", Dialects: []string{"S", "B"}, Source: "oraec-coptic-etymologies"}}}
+	if !reflect.DeepEqual(c.Lexicon[3], give) {
+		t.Errorf("joined entry = %+v", c.Lexicon[3])
+	}
+	// Not joined: the root entry, two homonyms, a clitic that already has English.
+	for _, i := range []int{4, 5, 6} {
+		if e := c.Lexicon[i]; e.English != "" || e.Pronunciations != nil {
+			t.Errorf("entry %s must not be joined: %+v", e.ID, e)
+		}
+	}
+	if c.Lexicon[0].Coptic != nil || m.Skipped["wiktionary-egy:homonyms"] != 1 || m.Skipped["wiktionary-egy:no AED entry"] != 2 ||
+		m.Skipped["oraec-coptic-etymologies:unknown lemma ID"] != 1 || m.Skipped["oraec-coptic-etymologies:no Egyptian lemma"] != 1 {
+		t.Errorf("skipped = %v", m.Skipped)
+	}
+	if st := m.LexiconStats["aed"]; st != (LexStats{Entries: 7, WithEnglish: 3, EnglishBorrowed: 1, WithGerman: 7, WithPronunciation: 1, WithCoptic: 1}) {
+		t.Errorf("lexicon stats = %+v", st)
+	}
+	if e := c.Lexicon[7]; e.Source != "coptic-dict" || e.Stage != Coptic || e.English != "one" || e.French != "un" {
 		t.Errorf("coptic entry = %+v", e)
 	}
 

@@ -268,7 +268,7 @@ func (g *GlossIndex) Lookup(text string, extra []string, perTerm, max int, exclu
 				continue
 			}
 			seen[r.entry] = true
-			out = append(out, Gloss{ID: e.ID, Source: e.Source, Lemma: e.Translit, English: e.English,
+			out = append(out, Gloss{ID: e.ID, Source: e.Source, Lemma: e.Translit, English: e.English, EnglishSource: e.EnglishSource,
 				German: e.German, POS: e.POS, Match: MatchExact, Term: term, Count: n})
 		}
 	}

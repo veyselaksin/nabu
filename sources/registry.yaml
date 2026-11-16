@@ -157,6 +157,10 @@ sources:
     url: https://codeload.github.com/oraec/coptic_etymologies/tar.gz/95d6316ab7bf65f8b594d94991f72125866ad843
     bytes: 18722
     sha256: 9827679df72b7aee8898e73016912a3bf417c1b94ad3aeef52afe41e8aba7016
+  - name: digitizing_coptic_etymologies_coptic_list_entries.csv
+    url: https://raw.githubusercontent.com/oraec/coptic_etymologies/95d6316ab7bf65f8b594d94991f72125866ad843/digitizing_coptic_etymologies_coptic_list_entries.csv
+    bytes: 35889
+    sha256: 455bea27cc81b73f329235580e320514b67bf43e46bd9b936511cbfbf0e66f58
 - key: oraec-raw
   name: ORAEC corpus raw data
   url: https://github.com/oraec/corpus_raw_data
@@ -247,6 +251,11 @@ sources:
   reason: Coptic IPA per dialect for the Coptic-informed pronunciation convention.
   notes: Community-edited; see wiktionary-egy.
   retrieved: '2026-11-16'
+  files:
+  - name: kaikki.org-dictionary-Coptic.jsonl
+    url: https://kaikki.org/dictionary/Coptic/kaikki.org-dictionary-Coptic.jsonl
+    bytes: 62844633
+    sha256: 00bfcbb666c57931cdf08437e076d190c161413cc68d943a929bdd12025f2a29
 - key: ud-coptic-scriptorium
   name: UD Coptic-Scriptorium treebank
   url: https://github.com/UniversalDependencies/UD_Coptic-Scriptorium
@@ -409,8 +418,8 @@ sources:
   - lemmatization
   - sign-list
   license: CC0-1.0 (JSON data); the website text is CC-BY-SA-3.0
-  license_evidence: 'each project archive''s metadata.json: ''This data is released under the CC0 license'' (read
-    from the downloaded archives listed in license_checked_in)'
+  license_evidence: 'metadata.json in each of the 11 archives under files: ''This data is released under the CC0 license''
+    (all 11 read on 2026-11-17)'
   share_alike: false
   access: bulk download (one JSON zip per project; documented open-data interface; no robots.txt)
   reliability: primary-edition
@@ -419,6 +428,51 @@ sources:
   notes: 'Archives are rebuilt upstream without version numbers: pinned by checksum and retrieval date. epsd2/admin/ur3
     (562 MB) and other large administrative sub-projects were not downloaded.'
   retrieved: '2026-11-16'
+  files:
+  - name: blms.zip
+    url: https://oracc.museum.upenn.edu/json/blms.zip
+    bytes: 11049307
+    sha256: 166eec1b87172de3aec3584adc3b8e1268919021981ae1dad355126e024ab36b
+  - name: dcclt.zip
+    url: https://oracc.museum.upenn.edu/json/dcclt.zip
+    bytes: 76742802
+    sha256: 5b75d5f3c8fdbd51f7c8b47bb06db48395be96bbf86ac495b8d0e390ff28fc40
+  - name: epsd2-literary.zip
+    url: https://oracc.museum.upenn.edu/json/epsd2-literary.zip
+    bytes: 39510771
+    sha256: 7bc5b6d1ab4919cf64ce305fb33474d3ab2272a003ffe4d20928574f0151ea31
+  - name: epsd2-royal.zip
+    url: https://oracc.museum.upenn.edu/json/epsd2-royal.zip
+    bytes: 15095615
+    sha256: f94bacbfecaed8741aa5cdd0239075d122976fdff2729ddac84303cfde6b997e
+  - name: epsd2.zip
+    url: https://oracc.museum.upenn.edu/json/epsd2.zip
+    bytes: 213382595
+    sha256: 0fe44861550a63029cb44d7081e5412b153bd57ef51497455f053a641eb5e90a
+  - name: etcsri.zip
+    url: https://oracc.museum.upenn.edu/json/etcsri.zip
+    bytes: 13197377
+    sha256: 66991601df193a5cb93bccf92e9051e86a98fbb668a9dd343477d14f0c9d54d6
+  - name: riao.zip
+    url: https://oracc.museum.upenn.edu/json/riao.zip
+    bytes: 18141566
+    sha256: f95dedbff2ae390acdccd6ea90408d34d14655935c254c3be1490b26eb8b4f08
+  - name: ribo.zip
+    url: https://oracc.museum.upenn.edu/json/ribo.zip
+    bytes: 6877355
+    sha256: cd8f059c3eed975a2d37a75e42bfc6d5ef04e68ac28283c5a7acb38ac5ce9df6
+  - name: rimanum.zip
+    url: https://oracc.museum.upenn.edu/json/rimanum.zip
+    bytes: 3068532
+    sha256: f741ff39ca411e21c8b672ad465b48a96eb9a84993fcfc55faf977b58bc72100
+  - name: rinap.zip
+    url: https://oracc.museum.upenn.edu/json/rinap.zip
+    bytes: 23728259
+    sha256: c2767ed72c88c3e5e68664a71ae4873eb17dcb483de67cbf6e063143bb3050a0
+  - name: saao.zip
+    url: https://oracc.museum.upenn.edu/json/saao.zip
+    bytes: 65783820
+    sha256: 29bcf61b55ef291a97180f836ca620e13a1bcab802dad7ff64e2baf2e9d7a17f
 - key: mtaac-gold
   name: MTAAC gold corpus (Ur III Sumerian, annotated)
   url: https://github.com/cdli-gh/mtaac_gold_corpus
@@ -547,6 +601,11 @@ sources:
   reason: English glosses and IPA.
   notes: Community-edited.
   retrieved: '2026-11-16'
+  files:
+  - name: kaikki.org-dictionary-Akkadian.jsonl
+    url: https://kaikki.org/dictionary/Akkadian/kaikki.org-dictionary-Akkadian.jsonl
+    bytes: 3009215
+    sha256: e61e73bffda33145a144c6a789cf7a6af61a77acd0739435c50a0a73a0a8aed5
 - key: wiktionary-sux
   name: English Wiktionary, Sumerian entries (kaikki.org)
   url: https://kaikki.org/dictionary/Sumerian/index.html
@@ -564,6 +623,11 @@ sources:
   reason: English glosses and IPA.
   notes: Community-edited.
   retrieved: '2026-11-16'
+  files:
+  - name: kaikki.org-dictionary-Sumerian.jsonl
+    url: https://kaikki.org/dictionary/Sumerian/kaikki.org-dictionary-Sumerian.jsonl
+    bytes: 2313965
+    sha256: 67aefa8cd355a9b28e282fd96953bbb41d721382b4ff6326b70af888db810fc3
 - key: cdli
   name: 'CDLI: Cuneiform Digital Library Initiative'
   url: https://cdli.earth/
@@ -636,6 +700,11 @@ sources:
   notes: 'License conflict: Zenodo says CC BY 4.0, the TLHdig site says CC BY-SA. Treat as share-alike until the
     project confirms. Transliteration only, no translations, beta quality.'
   retrieved: '2026-11-16'
+  files:
+  - name: TLHbasisONLINE25_1_ZENODO_Beta_03.zip
+    url: https://zenodo.org/api/records/20328284/files/TLHbasisONLINE25_1_ZENODO_Beta_03.zip/content
+    bytes: 74449198
+    sha256: c845a23223bb9461eeb215f5ede0e223c8871473873c6123eadaeb72114fcd36
 - key: ud-hittite-hittb
   name: UD Hittite-HitTB
   url: https://github.com/UniversalDependencies/UD_Hittite-HitTB
@@ -674,6 +743,11 @@ sources:
   reason: The only openly licensed Hittite-English word list found so far.
   notes: Community-edited.
   retrieved: '2026-11-16'
+  files:
+  - name: kaikki.org-dictionary-Hittite.jsonl
+    url: https://kaikki.org/dictionary/Hittite/kaikki.org-dictionary-Hittite.jsonl
+    bytes: 5009623
+    sha256: fd6cd576653702cbfd020c977a21399eae4298f51d2c6139923d3456c3b90deb
 - key: ediana
   name: 'eDiAna: Dictionary of the Minor Ancient Anatolian Corpus Languages'
   url: https://www.ediana.gwi.uni-muenchen.de/

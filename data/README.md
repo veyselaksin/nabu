@@ -23,6 +23,8 @@ go run ./data/cmd/nabu-data build-corpus          # → <root>/corpus/egy/ (make
 | `aes`: Ancient Egyptian Sentences (BBAW 2018 extract) | sentences, lemma IDs, hieroglyphs (package `aes`) | CC BY-SA 4.0 | corpus, **local only** |
 | `aed`: Ancient Egyptian Dictionary | lemmas with German/English meanings (package `aed`) | CC BY-SA 4.0 | corpus lexicon, **local only** |
 | `coptic-dict`: Comprehensive Coptic Lexicon v1.2 | entries with EN/DE/FR glosses (package `coptic`) | CC BY-SA 4.0 | corpus lexicon, **local only** |
+| `wiktionary-egy`: English Wiktionary, Egyptian entries | English glosses and labeled IPA for AED entries (package `wiktionary`) | CC BY-SA 4.0 | corpus lexicon, **local only** |
+| `oraec-coptic-etymologies`: ORAEC Coptic etymologies | Coptic descendants of Egyptian lemmas (package `oraec`) | CC0 1.0 | corpus lexicon |
 | `oracc`, `cdli` | – | unverified | `fetch` refuses until the license is recorded |
 
 Rules:
@@ -44,6 +46,22 @@ Rules:
 and `manifest.json` (sources, pinned files, counts) to `<root>/corpus/egy/`.
 Every record names its source and ID.
 
+- **Enriched dictionary entries.** An AED entry gets from Wiktionary an
+  English gloss when it has none (`en_source` then says so) and its labeled
+  IPA (`pronunciations`: "modern Egyptological" readings and dated
+  reconstructions), and from ORAEC the Coptic words it survives as
+  (`coptic`). Egyptian is full of homonyms, so a Wiktionary entry is joined
+  only when it is the only AED word and the only Wiktionary word with that
+  spelling and word class; roots and affixes are never joined. On the
+  2026-11-16 data that joins 1,434 entries (218 gain English, 1,421 a
+  pronunciation) and leaves 1,687 Wiktionary entries unused as homonyms.
+  Where both sources have English, 87% of the joined pairs share a word
+  stem, which is a floor for how often the join is right, not a review.
+  1,407 entries have Coptic descendants.
+- **Quality report.** `manifest.json` records per source what was dropped
+  as duplicate or skipped and why, and per lexicon source how many entries
+  have English, German, a pronunciation or no gloss at all; `build-corpus`
+  prints it.
 - **One convention.** AES uses the BBAW conventions of 2018.
   `aes.ConvertForm` converts them to the TLA v18 ones (`j`/`ı͗` → `ꞽ`,
   `,` → `.`, `≡` → `=`, `.pl` → `.PL`, lower case, editorial marks removed).

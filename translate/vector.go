@@ -35,8 +35,10 @@ type Doc struct {
 	Translit string `json:"translit"`
 	German   string `json:"de,omitempty"`
 	English  string `json:"en,omitempty"`
-	POS      string `json:"pos,omitempty"`
-	Date     string `json:"date,omitempty"`
+	// EnglishSource names where English comes from when it is not Source.
+	EnglishSource string `json:"en_source,omitempty"`
+	POS           string `json:"pos,omitempty"`
+	Date          string `json:"date,omitempty"`
 }
 
 // embedText is what gets embedded for a document. Queries carry an
@@ -249,7 +251,7 @@ func CorpusDocs(sentences []corpus.Sentence, lexicon []corpus.LexEntry) []Doc {
 			continue
 		}
 		out = append(out, Doc{ID: e.ID, Kind: KindLexicon, Source: e.Source, Stage: e.Stage,
-			Translit: e.Lemma, German: e.German, English: e.English, POS: e.POS})
+			Translit: e.Lemma, German: e.German, English: e.English, EnglishSource: e.EnglishSource, POS: e.POS})
 	}
 	return out
 }
@@ -268,6 +270,9 @@ type BuildOptions struct {
 
 // BuildVectors embeds docs and writes the index to dir. It resumes an
 // interrupted build: documents already embedded (same order) are kept.
+// Rebuilding over a finished index made with the same model and dimensions
+// embeds only texts that index does not have; the old index is set aside
+// (prev-*) until the new one is complete.
 func BuildVectors(ctx context.Context, emb Embedder, docs []Doc, dir string, opts BuildOptions) error {
 	if opts.Batch <= 0 {
 		opts.Batch = 64
@@ -275,11 +280,22 @@ func BuildVectors(ctx context.Context, emb Embedder, docs []Doc, dir string, opt
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
+	prev, err := previousVectors(dir, opts.Model, opts.Dims)
+	if err != nil {
+		return err
+	}
 	_ = os.Remove(filepath.Join(dir, manifestFile)) // incomplete until rewritten
 	done, dims, err := resumePoint(dir, docs, opts.Model, opts.Dims)
 	if err != nil {
 		return err
 	}
+	if dims == 0 && prev != nil {
+		dims = prev.dims
+		if err := writeBuildState(dir, buildState{Model: opts.Model, Dims: dims}); err != nil {
+			return err
+		}
+	}
+	reused := 0
 	vf, err := os.OpenFile(filepath.Join(dir, vecFile), os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o644)
 	if err != nil {
 		return err
@@ -298,9 +314,22 @@ func BuildVectors(ctx context.Context, emb Embedder, docs []Doc, dir string, opt
 		for j, d := range batch {
 			texts[j] = d.embedText()
 		}
-		vecs, err := embedRetry(ctx, emb, texts)
-		if err != nil {
-			return fmt.Errorf("embedding documents %d–%d: %w", i+1, i+len(batch), err)
+		// Vectors as stored bytes; nil until known.
+		stored := make([][]byte, len(batch))
+		var missing []string
+		var missingAt []int
+		for j, text := range texts {
+			if stored[j] = prev.lookup(text); stored[j] == nil {
+				missing, missingAt = append(missing, text), append(missingAt, j)
+			} else {
+				reused++
+			}
+		}
+		var vecs [][]float32
+		if len(missing) > 0 {
+			if vecs, err = embedRetry(ctx, emb, missing); err != nil {
+				return fmt.Errorf("embedding documents %d–%d: %w", i+1, i+len(batch), err)
+			}
 		}
 		if dims == 0 {
 			dims = len(vecs[0])
@@ -311,15 +340,20 @@ func BuildVectors(ctx context.Context, emb Embedder, docs []Doc, dir string, opt
 				return err
 			}
 		}
-		var vb []byte
-		var db strings.Builder
-		for j, v := range vecs {
+		for k, v := range vecs {
 			if len(v) < dims {
 				return fmt.Errorf("embedding has %d dimensions, want %d", len(v), dims)
 			}
+			b := make([]byte, 0, dims*2)
 			for _, x := range normalized(v[:dims]) {
-				vb = binary.LittleEndian.AppendUint16(vb, f32ToF16(x))
+				b = binary.LittleEndian.AppendUint16(b, f32ToF16(x))
 			}
+			stored[missingAt[k]] = b
+		}
+		var vb []byte
+		var db strings.Builder
+		for j := range batch {
+			vb = append(vb, stored[j]...)
 			line, _ := json.Marshal(batch[j])
 			db.Write(line)
 			db.WriteByte('\n')
@@ -335,7 +369,7 @@ func BuildVectors(ctx context.Context, emb Embedder, docs []Doc, dir string, opt
 			n := i + len(batch)
 			rate := float64(n-done) / time.Since(start).Seconds()
 			eta := time.Duration(float64(len(docs)-n)/rate) * time.Second
-			fmt.Fprintf(opts.Progress, "\rembedded %d/%d (%.0f/s, %s left)   ", n, len(docs), rate, eta.Round(time.Second))
+			fmt.Fprintf(opts.Progress, "\rembedded %d/%d (%d reused, %.0f/s, %s left)   ", n, len(docs), reused, rate, eta.Round(time.Second))
 		}
 	}
 	if opts.Progress != nil {
@@ -357,7 +391,74 @@ func BuildVectors(ctx context.Context, emb Embedder, docs []Doc, dir string, opt
 	if err := os.WriteFile(filepath.Join(dir, manifestFile), append(raw, '\n'), 0o644); err != nil {
 		return err
 	}
+	for _, name := range []string{vecFile, docFile, manifestFile} {
+		if err := os.Remove(filepath.Join(dir, prevPrefix+name)); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+	}
 	return os.Remove(filepath.Join(dir, buildFile))
+}
+
+const prevPrefix = "prev-"
+
+// prevVectors are the vectors of the index a rebuild replaces, by the text
+// that was embedded.
+type prevVectors struct {
+	dims int
+	data []byte         // stored half-precision vectors
+	at   map[string]int // embedded text → record number
+}
+
+// lookup returns the stored vector for text, or nil.
+func (p *prevVectors) lookup(text string) []byte {
+	if p == nil {
+		return nil
+	}
+	i, ok := p.at[text]
+	if !ok {
+		return nil
+	}
+	return p.data[i*p.dims*2 : (i+1)*p.dims*2]
+}
+
+// previousVectors sets a finished index in dir aside as prev-* and loads
+// it (or one set aside by an interrupted rebuild). It returns nil when
+// there is none or it was built with another model or dimension count.
+func previousVectors(dir, model string, wantDims int) (*prevVectors, error) {
+	path := func(name string) string { return filepath.Join(dir, prevPrefix+name) }
+	if _, err := os.Stat(filepath.Join(dir, manifestFile)); err == nil {
+		// Manifest last: without it the set-aside copy is not used.
+		for _, name := range []string{vecFile, docFile, manifestFile} {
+			if err := os.Rename(filepath.Join(dir, name), path(name)); err != nil {
+				return nil, err
+			}
+		}
+		_ = os.Remove(filepath.Join(dir, buildFile))
+	}
+	var m VectorManifest
+	raw, err := os.ReadFile(path(manifestFile))
+	if err != nil || json.Unmarshal(raw, &m) != nil || m.Model != model || m.Dims <= 0 ||
+		(wantDims > 0 && m.Dims != wantDims) {
+		return nil, nil
+	}
+	f, err := os.Open(path(docFile))
+	if err != nil {
+		return nil, nil
+	}
+	docs, err := readDocs(f)
+	f.Close()
+	if err != nil {
+		return nil, nil
+	}
+	data, err := os.ReadFile(path(vecFile))
+	if err != nil || len(data) < len(docs)*m.Dims*2 {
+		return nil, nil
+	}
+	p := &prevVectors{dims: m.Dims, data: data, at: make(map[string]int, len(docs))}
+	for i, d := range docs {
+		p.at[d.embedText()] = i
+	}
+	return p, nil
 }
 
 // buildState records an in-progress build, so that it can resume.

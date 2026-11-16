@@ -20,10 +20,12 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -346,6 +348,17 @@ func cmdBuildCorpus(args []string, getenv func(string) string, stdout, stderr io
 	m := c.Manifest
 	for _, s := range m.Sources {
 		fmt.Fprintf(stdout, "%-12s %7d records  (duplicates dropped: %d, skipped: %d)\n", s.Key, s.Records, m.Duplicates[s.Key], m.Skipped[s.Key])
+	}
+	for _, k := range slices.Sorted(maps.Keys(m.Skipped)) {
+		if strings.Contains(k, ":") {
+			fmt.Fprintf(stdout, "  not used, %s: %d\n", k, m.Skipped[k])
+		}
+	}
+	for _, k := range slices.Sorted(maps.Keys(m.LexiconStats)) {
+		st := m.LexiconStats[k]
+		fmt.Fprintf(stdout, "lexicon %-12s %6d entries: %d with English (%d from another source), %d with German, "+
+			"%d with pronunciation, %d with Coptic descendants, %d without any gloss\n",
+			k, st.Entries, st.WithEnglish, st.EnglishBorrowed, st.WithGerman, st.WithPronunciation, st.WithCoptic, st.NoGloss)
 	}
 	fmt.Fprintf(stdout, "sentences: %d %v\nlexicon:   %d\nwrote %s\n", m.Sentences, m.Stages, m.Lexicon, *out)
 	fmt.Fprintln(stdout, "license: CC BY-SA 4.0 (share-alike); keep it local, see DATA_LICENSES.md")

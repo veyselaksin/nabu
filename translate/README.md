@@ -64,7 +64,8 @@ Every output word is then checked, and the response says for each one:
 `coverage` lists each content word of the input and the output words whose
 dictionary entry has it as a gloss. A word that is not matched may be
 missing from the translation, or translated by a lemma that only has a
-German gloss (about half of the AED entries have no English).
+German gloss (about half of the AED entries have no English; the corpus
+build fills in 218 of them from Wiktionary, marked `en_source`).
 
 **Confidence** is the share of output words with `dictionary` or `example`
 evidence, times the share of input words matched in `coverage`. It measures
@@ -89,6 +90,11 @@ convention, so read the numbers as a comparison between settings. On the
 | --- | ---: | ---: | ---: | ---: |
 | vector search only | 28.6% | 63.4% | 79.5% | 0.439 |
 | exact lookup + vector search | 67.0% | 82.1% | 88.4% | 0.739 |
+| the same, after Wiktionary glosses joined the lexicon | 67.9% | 83.0% | 89.3% | 0.748 |
+
+The last row is not an independent gain: the queries come from Wiktionary
+too, and 6 of the 112 have an answer whose English gloss is now
+Wiktionary's own.
 
 Responses include the examples and glossary entries with their record IDs and
 sources (`tla:…`, `aes:…`, `aed:…`), the German search terms, and `retrieval`:
@@ -100,7 +106,7 @@ BM25 and says why in `retrieval_note`.
 ```sh
 make corpus       # fetch all sources (~400 MB) and merge them into $(CORPUS)
 make embed-pull   # qwen3-embedding:0.6b into Ollama (~640 MB, Apache-2.0)
-make rag-index    # embed ~126k sentences and entries into $(RAG_INDEX) (~1 h, resumable)
+make rag-index    # embed ~126k sentences and entries into $(RAG_INDEX) (~1 h the first time, resumable; a rebuild embeds only new or changed texts)
 ```
 
 `nabu-data build-corpus` merges TLA Earlier Egyptian v18, Late Egyptian v19,

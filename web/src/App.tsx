@@ -649,7 +649,10 @@ function Translation({ result }: { result: TranslateResult }) {
                 <span className="translit-sm" lang="egy-Latn">
                   {g.lemma}
                 </span>
-                <span>{g.en || <span className="muted" lang="de">{g.de}</span>}</span>
+                <span>
+                  {g.en || <span className="muted" lang="de">{g.de}</span>}
+                  {g.en_source && <span className="muted"> (English: {g.en_source})</span>}
+                </span>
                 <span className="provenance">
                   {g.id}
                   {g.pos ? ` · ${g.pos}` : ""}
