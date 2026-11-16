@@ -1,10 +1,8 @@
 # Knowledge base and retrieval: comparison and design (Phase 2)
 
-Status 2026-11-16: the vector-store comparison is measured (section 1). The
-embedding-model comparison (section 2) is designed but not run: it needs
-model downloads over 1 GB, which wait for approval. Sections 3 to 6 are the
-proposed design; nothing in them is built yet except what section 5 marks as
-existing.
+Status 2026-11-17: the vector-store comparison (section 1) and the
+embedding-model comparison on dictionary entries (section 2) are measured.
+Sections 3 to 6 are the design; section 5 says which parts of it are built.
 
 ## 1. Vector store
 
@@ -186,13 +184,25 @@ Existing: pinned downloads with checksums (`nabu-data fetch`), a merge with
 normalization and deduplication (`build-corpus`), a resumable index build
 (`nabu-translate index`).
 
+Built on 2026-11-17:
+
+- loaders for Wiktionary and the ORAEC Coptic etymologies, joined into the
+  AED lexicon entries (English where missing, labeled IPA, Coptic
+  descendants; the join rule and its measured agreement are in
+  `data/README.md`);
+- a first quality report in the corpus manifest: per source what was
+  dropped or skipped and why, and per lexicon source how many entries have
+  English, German, a pronunciation or no gloss;
+- index rebuilds that embed only new or changed texts: after the lexicon
+  changed, the rebuild embedded 218 of 125,879 documents and took 20 s
+  instead of about an hour.
+
 To add:
 
-- one loader per new source (ORAEC etymologies and metadata, Wiktionary,
-  UD), each writing records in the schema above;
-- a data-quality report per source, written next to the corpus: record
-  counts, empty fields, characters outside the language's alphabet,
-  duplicate rate, length outliers;
+- loaders for the ORAEC text metadata and the UD treebank, each writing
+  records in the schema above;
+- the rest of the quality report: characters outside the language's
+  alphabet and length outliers;
 - `translit_orig` kept alongside `translit` for every source that is
   normalized (AES, UD, Wiktionary);
 - the Go registry generated from `sources/registry.yaml`, so that a source
