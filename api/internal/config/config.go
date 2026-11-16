@@ -50,6 +50,16 @@ type Config struct {
 	// used for retrieval and the vocabulary check. Required with LLMURL.
 	// Env: NABU_TLA_CORPUS.
 	TLACorpus string
+	// RAGIndex is the vector index built by `nabu-translate index`. If set,
+	// translation retrieves by meaning (embeddings) as well as by German
+	// keywords, and adds dictionary entries. Env: NABU_RAG_INDEX.
+	RAGIndex string
+	// EmbedURL is the OpenAI-compatible API serving EmbedModel. Env:
+	// NABU_EMBED_URL (default: LLMURL).
+	EmbedURL string
+	// EmbedModel must be the model the index was built with. Env:
+	// NABU_EMBED_MODEL (default qwen3-embedding:0.6b).
+	EmbedModel string
 	// TranslateTimeout bounds POST /v1/translate. Env: NABU_TRANSLATE_TIMEOUT
 	// (default 3m: a language model on CPU is slow).
 	TranslateTimeout time.Duration
@@ -67,6 +77,9 @@ func FromEnv(getenv func(string) string) (Config, error) {
 		LLMModel:         strings.TrimSpace(getenv("NABU_LLM_MODEL")),
 		LLMAPIKey:        strings.TrimSpace(getenv("NABU_LLM_API_KEY")),
 		TLACorpus:        strings.TrimSpace(getenv("NABU_TLA_CORPUS")),
+		RAGIndex:         strings.TrimSpace(getenv("NABU_RAG_INDEX")),
+		EmbedURL:         strings.TrimSpace(getenv("NABU_EMBED_URL")),
+		EmbedModel:       strings.TrimSpace(getenv("NABU_EMBED_MODEL")),
 		TranslateTimeout: 3 * time.Minute,
 		LogLevel:         slog.LevelInfo,
 		LogFormat:        "json",
@@ -110,6 +123,12 @@ func FromEnv(getenv func(string) string) (Config, error) {
 	}
 	if c.LLMURL != "" && c.TLACorpus == "" {
 		return c, fmt.Errorf("NABU_TLA_CORPUS must be set when NABU_LLM_URL is set (run: make data-fetch)")
+	}
+	if c.EmbedURL == "" {
+		c.EmbedURL = c.LLMURL
+	}
+	if c.EmbedModel == "" {
+		c.EmbedModel = "qwen3-embedding:0.6b"
 	}
 	if v := getenv("NABU_TTS_THREADS"); v != "" {
 		n, err := strconv.Atoi(v)

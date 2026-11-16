@@ -108,9 +108,29 @@ func run() error {
 		}
 		client := &translate.Client{BaseURL: cfg.LLMURL, Model: cfg.LLMModel, APIKey: cfg.LLMAPIKey,
 			HTTP: &http.Client{}}
-		opts.Translator = translate.New(client, index, translate.Options{})
+		topts := translate.Options{}
+		retrieval := "bm25"
+		if cfg.RAGIndex != "" {
+			if _, err := os.Stat(cfg.RAGIndex); err != nil {
+				log.Warn("vector index not found; retrieval is BM25 only (build it: make corpus rag-index)", "path", cfg.RAGIndex)
+			} else {
+				vx, err := translate.LoadRAG(cfg.RAGIndex, index)
+				if err != nil {
+					return fmt.Errorf("loading vector index (NABU_RAG_INDEX): %w", err)
+				}
+				if vx.Manifest.Model != cfg.EmbedModel {
+					return fmt.Errorf("vector index %s was built with %s, but NABU_EMBED_MODEL is %s", cfg.RAGIndex, vx.Manifest.Model, cfg.EmbedModel)
+				}
+				topts.Vectors = vx
+				topts.Embedder = &translate.Client{BaseURL: cfg.EmbedURL, Model: cfg.EmbedModel, APIKey: cfg.LLMAPIKey, HTTP: &http.Client{}}
+				retrieval = "hybrid"
+				log.Info("vector index loaded", "path", cfg.RAGIndex, "docs", vx.Len(), "dims", vx.Manifest.Dims,
+					"embed_model", cfg.EmbedModel, "embed_url", cfg.EmbedURL)
+			}
+		}
+		opts.Translator = translate.New(client, index, topts)
 		opts.TranslatorPing = client
-		log.Info("translation enabled", "llm_url", cfg.LLMURL, "model", cfg.LLMModel,
+		log.Info("translation enabled", "llm_url", cfg.LLMURL, "model", cfg.LLMModel, "retrieval", retrieval,
 			"examples", index.Len(), "forms", index.Forms(), "corpus", cfg.TLACorpus)
 		// The model server may start later; report it without failing.
 		pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)

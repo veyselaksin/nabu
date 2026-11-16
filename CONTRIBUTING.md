@@ -62,10 +62,20 @@ OSI-approved license that permits commercial use.
 
 ### 3. No corpus data, audio or model weights in git
 
-Only scripts that *download and clean* data are committed. Downloads go to
-`data/corpora/`, which is git-ignored. Record each source's terms in
-`DATA_LICENSES.md`. Audio (`*.wav`, `*.mp3`), checkpoints (`*.pt`), exported
-models (`*.onnx`) and training runs (`runs/`) are git-ignored too.
+Only scripts that *download and clean* data are committed. Record each
+source's terms in `DATA_LICENSES.md`. Downloads, prepared audio, checkpoints
+(`*.pt`), exported models (`*.onnx`) and training runs stay outside git:
+
+| Kind | Variable | With `MODELS_ROOT` set | Otherwise (git-ignored) |
+| --- | --- | --- | --- |
+| Corpora, prepared TTS data | `NABU_DATA_DIR` | `$MODELS_ROOT/projects/nabu/datasets` | `data/corpora/` |
+| Checkpoints, exported voices | `NABU_CHECKPOINT_DIR` | `$MODELS_ROOT/projects/nabu/checkpoints` | `runs/checkpoints/` |
+| Training logs, MLflow, samples | `NABU_RUNS_DIR` | `$MODELS_ROOT/projects/nabu/training-runs` | `runs/` |
+
+`NABU_HOME` replaces `$MODELS_ROOT/projects/nabu`. Base models (e.g. Qwen) come
+from the shared Hugging Face / Ollama caches, never copied into the project.
+`make paths` prints what is in effect; a `MODELS_ROOT` that is not mounted is
+an error, never a silent fallback to the internal disk.
 
 ### 4. The TTS symbol table is append-only
 

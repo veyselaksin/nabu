@@ -3,12 +3,16 @@
 # Data comes from `nabu-tts-smoke-data` (synthetic tones, not speech), so the
 # resulting model is useless for listening. Run from the repository root:
 #
-#   uv run nabu-tts-smoke-data --out runs/smoke-data
+#   uv run nabu-tts-smoke-data
 #   uv run nabu-tts-train --config tts/train/configs/smoke.yaml
+#
+# ${NABU_*} roots: see nabu_tts/paths.py (`uv run nabu-tts-paths` prints them).
 run_name: smoke
-output_dir: runs/smoke
+output_dir: ${NABU_RUNS_DIR}/smoke
+checkpoint_dir: ${NABU_CHECKPOINT_DIR}/vits/smoke
 data:
-  manifests: [runs/smoke-data/manifest.jsonl]
+  manifests:
+    - ${NABU_DATA_DIR}/tts/smoke/manifest.jsonl
   val_size: 4
   sample_rate: 16000
   filter_length: 512
@@ -46,5 +50,5 @@ model:
   gin_channels: 32
   use_sdp: true
 mlflow:
-  tracking_uri: sqlite:///runs/mlflow.db
+  tracking_uri: sqlite:///${NABU_RUNS_DIR}/mlflow.db
   experiment: nabu-tts-smoke

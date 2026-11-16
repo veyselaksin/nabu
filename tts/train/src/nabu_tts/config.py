@@ -9,6 +9,8 @@ from typing import Any
 
 import yaml
 
+from nabu_tts.paths import expand
+
 
 @dataclass
 class DataConfig:
@@ -80,9 +82,9 @@ class ModelConfig:
 
 @dataclass
 class MlflowConfig:
-    # sqlite store via mlflow-skinny + sqlalchemy. View with:
-    #   uvx mlflow ui --backend-store-uri sqlite:///runs/mlflow.db
-    tracking_uri: str = "sqlite:///runs/mlflow.db"
+    # sqlite store via mlflow-skinny + sqlalchemy. View with (from the repo root):
+    #   uvx mlflow ui --backend-store-uri "sqlite:///$(uv run nabu-tts-paths runs)/mlflow.db"
+    tracking_uri: str = "sqlite:///${NABU_RUNS_DIR}/mlflow.db"
     experiment: str = "nabu-tts"
     enabled: bool = True
 
@@ -90,7 +92,11 @@ class MlflowConfig:
 @dataclass
 class Config:
     run_name: str = "nabu-tts"
-    output_dir: str = "runs/nabu-tts"
+    # Paths may use ${NABU_DATA_DIR}, ${NABU_RUNS_DIR} and ${NABU_CHECKPOINT_DIR}
+    # (see nabu_tts.paths). output_dir holds config.yaml and samples/;
+    # checkpoint_dir (default: <output_dir>/checkpoints) holds step_*.pt and latest.pt.
+    output_dir: str = "${NABU_RUNS_DIR}/nabu-tts"
+    checkpoint_dir: str | None = None
     symbols: str | None = None  # default: tts/symbols.txt
     data: DataConfig = field(default_factory=DataConfig)
     train: TrainConfig = field(default_factory=TrainConfig)
@@ -99,6 +105,13 @@ class Config:
 
     def to_dict(self) -> dict[str, Any]:
         return dataclasses.asdict(self)
+
+    def expand_paths(self) -> None:
+        """Resolve ${NABU_*} roots in the path settings, in place."""
+        self.output_dir = expand(self.output_dir)
+        self.checkpoint_dir = expand(self.checkpoint_dir or f"{self.output_dir}/checkpoints")
+        self.data.manifests = [expand(m) for m in self.data.manifests]
+        self.mlflow.tracking_uri = expand(self.mlflow.tracking_uri)
 
     def validate(self) -> None:
         hop = self.data.hop_length
@@ -148,6 +161,7 @@ _SECTIONS: dict[str, type] = {
 
 def config_from_dict(raw: dict[str, Any], where: str = "config") -> Config:
     cfg = _build(Config, raw, where)
+    cfg.expand_paths()
     cfg.validate()
     return cfg
 

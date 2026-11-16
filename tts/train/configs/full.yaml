@@ -3,13 +3,15 @@
 #
 #   uv run nabu-tts-train --config tts/train/configs/full.yaml
 #
-# Re-running the same command resumes from runs/full/checkpoints/latest.pt.
+# Re-running the same command resumes from ${NABU_CHECKPOINT_DIR}/vits/egy/latest.pt.
+# ${NABU_*} roots: see nabu_tts/paths.py (`uv run nabu-tts-paths` prints them).
 run_name: full
-output_dir: runs/full
+output_dir: ${NABU_RUNS_DIR}/full
+checkpoint_dir: ${NABU_CHECKPOINT_DIR}/vits/egy
 data:
   # TODO(decision): the donor language mix. Choose it from the
   # nabu-tts-coverage report, prepare each locale with nabu-tts-prepare, and
-  # list the manifests here, e.g. runs/data/<locale>/manifest.jsonl.
+  # list the manifests here, e.g. ${NABU_DATA_DIR}/tts/<locale>/manifest.jsonl.
   manifests: []
   val_size: 100
   sample_rate: 22050
@@ -55,5 +57,5 @@ model:
   gin_channels: 256
   use_sdp: true
 mlflow:
-  tracking_uri: sqlite:///runs/mlflow.db
+  tracking_uri: sqlite:///${NABU_RUNS_DIR}/mlflow.db
   experiment: nabu-tts

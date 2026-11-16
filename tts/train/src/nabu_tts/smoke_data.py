@@ -6,7 +6,7 @@ It is not speech and teaches nothing about pronunciation. Token strings are
 random sequences of the symbols a rule file can emit (default: egy-allen), so
 the smoke model can synthesize those rule outputs end to end.
 
-    uv run nabu-tts-smoke-data --out runs/smoke-data
+    uv run nabu-tts-smoke-data   # → $NABU_DATA_DIR/tts/smoke (see nabu_tts.paths)
 """
 
 from __future__ import annotations
@@ -21,6 +21,7 @@ import numpy as np
 from nabu_tts.audio import write_wav
 from nabu_tts.coverage import DEFAULT_RULES
 from nabu_tts.manifest import Entry, write_manifest
+from nabu_tts.paths import data_dir
 from nabu_tts.rules import read_rule_outputs
 from nabu_tts.symbols import load_symbols
 
@@ -49,7 +50,7 @@ def render(
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="nabu-tts-smoke-data", description=__doc__.split("\n")[0])
-    ap.add_argument("--out", default="runs/smoke-data")
+    ap.add_argument("--out", default=str(data_dir() / "tts" / "smoke"))
     ap.add_argument("--rules", default=str(DEFAULT_RULES))
     ap.add_argument("--symbols")
     ap.add_argument("--clips", type=int, default=96)

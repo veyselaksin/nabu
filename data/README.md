@@ -2,20 +2,27 @@
 
 Go module with one command, `nabu-data`. It downloads Nabu's upstream data
 and builds derived files from it. **No corpus data is committed.** Downloads
-go to `data/corpora/<source>/`, or `$NABU_DATA_DIR/<source>`, which is
-git-ignored and excluded from Docker images.
+go to `<root>/<source>/`, where `<root>` is `$NABU_DATA_DIR`, else
+`$NABU_HOME/datasets`, else `$MODELS_ROOT/projects/nabu/datasets` when
+`MODELS_ROOT` is set (a shared model drive; it must be mounted), else the
+git-ignored `data/corpora/`, which is also excluded from Docker images.
 
 ```sh
 go run ./data/cmd/nabu-data sources               # every source, its license and pinned files
 go run ./data/cmd/nabu-data fetch unikemet tla    # download (make data-fetch)
 go run ./data/cmd/nabu-data build-signs           # → script/signs/egy-unikemet-uniliterals.tsv (make signs)
-go run ./data/cmd/nabu-data build-lexicon         # → data/corpora/tla/lexicon-egy.tsv (make lexicon)
+go run ./data/cmd/nabu-data build-lexicon         # → <root>/tla/lexicon-egy.tsv (make lexicon)
+go run ./data/cmd/nabu-data build-corpus          # → <root>/corpus/egy/ (make corpus)
 ```
 
 | Source | What Nabu uses | License | Output |
 | --- | --- | --- | --- |
 | `unikemet`: Unicode Unikemet database 18.0.0 | sign values (`kEH_FVal`) and functions (`kEH_Func`) | Unicode-3.0 | sign list, **committed** (permissive) |
-| `tla`: TLA Earlier Egyptian sentences, corpus v18 | aligned hieroglyphs + transliteration | CC BY-SA 4.0 | spelling lexicon, **local only** |
+| `tla`: TLA Earlier Egyptian sentences, corpus v18 | aligned hieroglyphs + transliteration | CC BY-SA 4.0 | spelling lexicon, corpus, **local only** |
+| `tla-late`, `tla-demotic`: TLA Late Egyptian v19, Demotic v18 | sentences with German translations | CC BY-SA 4.0 | corpus, **local only** |
+| `aes`: Ancient Egyptian Sentences (BBAW 2018 extract) | sentences, lemma IDs, hieroglyphs (package `aes`) | CC BY-SA 4.0 | corpus, **local only** |
+| `aed`: Ancient Egyptian Dictionary | lemmas with German/English meanings (package `aed`) | CC BY-SA 4.0 | corpus lexicon, **local only** |
+| `coptic-dict`: Comprehensive Coptic Lexicon v1.2 | entries with EN/DE/FR glosses (package `coptic`) | CC BY-SA 4.0 | corpus lexicon, **local only** |
 | `oracc`, `cdli` | – | unverified | `fetch` refuses until the license is recorded |
 
 Rules:
@@ -28,8 +35,30 @@ Rules:
   `../DATA_LICENSES.md` before downloading anything. A source whose license
   isn't recorded can't be fetched.
 - **Share-alike stays local.** Anything derived from TLA is CC BY-SA 4.0. The
-  lexicon is written under `data/corpora/`, and `build-lexicon` refuses to
+  lexicon is written under `<root>`, and `build-lexicon` refuses to
   write into `script/`, where it would be embedded and committed.
+
+## The merged corpus
+
+`build-corpus` (package `corpus`) writes `sentences.jsonl`, `lexicon.jsonl`
+and `manifest.json` (sources, pinned files, counts) to `<root>/corpus/egy/`.
+Every record names its source and ID.
+
+- **One convention.** AES uses the BBAW conventions of 2018.
+  `aes.ConvertForm` converts them to the TLA v18 ones (`j`/`ı͗` → `ꞽ`,
+  `,` → `.`, `≡` → `=`, `.pl` → `.PL`, lower case, editorial marks removed).
+  On the 5,600 AES sentences that the TLA also has, 96.1% of 15,932 tokens
+  convert to exactly the TLA form. The rest are different editorial
+  readings. TLA Late Egyptian's `⸗` becomes `=`.
+- **Intact sentences only**, like the TLA "premium" sets: AES sentences with
+  lacunae (`...`, `_`) or uncertain readings (`?`, `⸮`) are skipped.
+- **Deduplication.** TLA is read first (the newer edition). A later sentence
+  with the same lemma IDs and translation, or the same transliteration and
+  translation, is dropped. A TLA sentence that AES also has gets AES's text
+  ID, so that train/test splits can keep whole texts together (`group`).
+- **Stage.** TLA sets give `earlier`, `late` or `demotic`. AES gives `earlier`
+  for Old/Middle Kingdom texts and leaves later texts unknown, because they
+  may be in Middle Egyptian, Late Egyptian or Demotic.
 
 ## How the sign list is chosen
 

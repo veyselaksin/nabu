@@ -85,11 +85,12 @@ func TestSearch(t *testing.T) {
 	}
 }
 
-// fakeLLM answers the keyword and translation prompts with canned replies.
+// fakeLLM answers the keyword and translation prompts with canned replies,
+// and a correction request with correction (default: translation again).
 type fakeLLM struct {
-	keywords, translation string
-	err                   error
-	calls                 [][]Message
+	keywords, translation, correction string
+	err                               error
+	calls                             [][]Message
 }
 
 func (f *fakeLLM) Chat(_ context.Context, m []Message, opts ChatOptions) (string, error) {
@@ -102,6 +103,9 @@ func (f *fakeLLM) Chat(_ context.Context, m []Message, opts ChatOptions) (string
 	}
 	if strings.Contains(m[0].Content, `"keywords"`) {
 		return f.keywords, nil
+	}
+	if len(m) > 2 && f.correction != "" {
+		return f.correction, nil
 	}
 	return f.translation, nil
 }
@@ -123,7 +127,7 @@ func TestTranslate(t *testing.T) {
 	if !reflect.DeepEqual(res.Keywords, []string{"Brot", "König"}) {
 		t.Errorf("Keywords = %q", res.Keywords)
 	}
-	wantWords := []Word{{"tʾ", true, 2}, {"nzw", true, 2}, {"xyz", false, 0}}
+	wantWords := []Word{{Form: "tʾ", Attested: true, Count: 2}, {Form: "nzw", Attested: true, Count: 2}, {Form: "xyz"}}
 	if !reflect.DeepEqual(res.Words, wantWords) {
 		t.Errorf("Words = %+v, want %+v", res.Words, wantWords)
 	}
@@ -146,6 +150,85 @@ func TestTranslate(t *testing.T) {
 			t.Errorf("translation prompt lacks %q:\n%s", want, prompt)
 		}
 	}
+}
+
+func TestGraphemes(t *testing.T) {
+	got := graphemes("di̯ =ꞽ")
+	want := []string{"d", "i̯", " ", "=", "ꞽ"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("graphemes = %q, want %q", got, want)
+	}
+}
+
+func TestAlphabet(t *testing.T) {
+	// 40,009 graphemes: the threshold is 2 occurrences, so the single bare
+	// "i" is foreign while "i̯" (twice) belongs to the alphabet.
+	forms := map[string]int{"ꞽ": 40000, "di̯": 2, "=f": 2, "i": 1}
+	got := graphemeAlphabet(forms)
+	want := []string{"ꞽ", "=", "d", "f", "i̯"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("alphabet = %q, want %q", got, want)
+	}
+
+	ix := fixtureIndex(t)
+	for form, want := range map[string][]string{
+		"ꜥnḫ": nil, "ḥnq(.t)": nil, "=f": nil, "ȝḫ": {"ȝ"}, "ʿʿnḫȝ": {"ʿ", "ȝ"},
+	} {
+		if got := ix.Foreign(form); !reflect.DeepEqual(got, want) {
+			t.Errorf("Foreign(%q) = %q, want %q", form, got, want)
+		}
+	}
+}
+
+func TestTranslateCorrection(t *testing.T) {
+	ix := fixtureIndex(t)
+	t.Run("corrected", func(t *testing.T) {
+		llm := &fakeLLM{
+			keywords:    "{}",
+			translation: `{"transliteration": "ʿnḫ ȝḫ"}`,
+			correction:  `{"transliteration": "ꜥnḫ ȝḫ", "notes": "fixed"}`,
+		}
+		res, err := New(llm, ix, Options{}).Translate(context.Background(), "life")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if res.Transliteration != "ꜥnḫ ȝḫ" || !res.Corrected || res.Notes != "fixed" {
+			t.Errorf("result = %+v", res)
+		}
+		want := []Word{{Form: "ꜥnḫ", Attested: true, Count: 4}, {Form: "ȝḫ", Foreign: []string{"ȝ"}}}
+		if !reflect.DeepEqual(res.Words, want) {
+			t.Errorf("Words = %+v, want %+v", res.Words, want)
+		}
+		if len(llm.calls) != 3 {
+			t.Fatalf("%d model calls, want 3", len(llm.calls))
+		}
+		if !strings.Contains(llm.calls[1][0].Content, "ꞽ") {
+			t.Error("system prompt lacks the alphabet")
+		}
+		retry := llm.calls[2]
+		if len(retry) != 4 || retry[2].Role != "assistant" || !strings.Contains(retry[3].Content, `ʿnḫ ("ʿ"), ȝḫ ("ȝ")`) {
+			t.Errorf("correction request = %+v", retry)
+		}
+	})
+	t.Run("no better", func(t *testing.T) {
+		llm := &fakeLLM{keywords: "{}", translation: `{"transliteration": "ȝḫ"}`, correction: "not json"}
+		res, err := New(llm, ix, Options{}).Translate(context.Background(), "spirit")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if res.Transliteration != "ȝḫ" || res.Corrected || len(res.Words[0].Foreign) != 1 {
+			t.Errorf("result = %+v", res)
+		}
+	})
+	t.Run("valid needs no correction", func(t *testing.T) {
+		llm := &fakeLLM{keywords: "{}", translation: `{"transliteration": "ꜥnḫ"}`}
+		if _, err := New(llm, ix, Options{}).Translate(context.Background(), "life"); err != nil {
+			t.Fatal(err)
+		}
+		if len(llm.calls) != 2 {
+			t.Errorf("%d model calls, want 2", len(llm.calls))
+		}
+	})
 }
 
 func TestTranslateUnparsableKeywords(t *testing.T) {

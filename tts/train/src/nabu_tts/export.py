@@ -1,6 +1,7 @@
 """nabu-tts-export: checkpoint → one ONNX file + filled-in model card, with a parity check.
 
-    uv run nabu-tts-export --checkpoint runs/smoke/checkpoints/latest.pt --out runs/smoke/model.onnx
+    CKPT=$(uv run nabu-tts-paths checkpoints)/vits/smoke
+    uv run nabu-tts-export --checkpoint "$CKPT/latest.pt" --out "$CKPT/model.onnx"
 
 ONNX interface (what the Go runtime in package tts expects):
 

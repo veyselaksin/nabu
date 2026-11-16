@@ -1,0 +1,99 @@
+# The whole stack in one command:
+#
+#   docker compose up --build
+#
+# then open http://localhost:5173 (web demo) or call http://localhost:8080 (API).
+#
+# The first start downloads the TLA corpus (CC BY-SA 4.0) into NABU_DATA_DIR
+# and the language model (~2.5 GB, Apache-2.0) into OLLAMA_MODELS; later starts
+# reuse both. Ollama runs on the CPU inside Docker (no Metal on macOS), so give
+# Docker at least ~6 GB of memory.
+#
+# Everything heavy is bind-mounted from the host, never kept in Docker volumes
+# (on macOS those live in Docker Desktop's disk image on the internal drive).
+# Host paths (shell environment or a .env file next to this one; see
+# .env.example for a shared model drive):
+#   NABU_DATA_DIR=./data/corpora              corpora and the TLA lexicon
+#   NABU_CHECKPOINT_DIR=./runs/checkpoints    exported voices (vits/<language>/model.onnx)
+#   OLLAMA_MODELS=./.ollama/models            Ollama's model store (shared with a host Ollama)
+# Other overrides:
+#   LLM_MODEL=qwen3:4b-instruct                       model to pull and use for translation
+#   TTS_MODEL=/checkpoints/vits/smoke/model.onnx      voice under NABU_CHECKPOINT_DIR; TTS_MODEL= disables speech
+#   API_PORT=8080 WEB_PORT=5173 OLLAMA_PORT=11434
+
+name: nabu
+
+services:
+  ollama:
+    image: ollama/ollama:0.12.6
+    volumes:
+      - "${OLLAMA_MODELS:-./.ollama/models}:/root/.ollama/models"
+    ports:
+      - "127.0.0.1:${OLLAMA_PORT:-11434}:11434"
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  # One-shot: pulls the model (a no-op once it is in OLLAMA_MODELS).
+  ollama-pull:
+    image: ollama/ollama:0.12.6
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["ollama", "pull", "${LLM_MODEL:-qwen3:4b-instruct}"]
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
+
+  # One-shot: downloads TLA and builds the lexicon unless both already exist.
+  data:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+      target: data
+    volumes:
+      - "${NABU_DATA_DIR:-./data/corpora}:/data/corpora"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        if [ -s /data/corpora/tla/train.jsonl ] && [ -s /data/corpora/tla/lexicon-egy.tsv ]; then
+          echo "TLA corpus and lexicon present"
+          exit 0
+        fi
+        nabu-data fetch tla
+        nabu-data build-lexicon
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    environment:
+      NABU_LEXICON: /data/corpora/tla/lexicon-egy.tsv
+      NABU_TLA_CORPUS: /data/corpora/tla/train.jsonl
+      NABU_LLM_URL: http://ollama:11434/v1
+      NABU_LLM_MODEL: ${LLM_MODEL:-qwen3:4b-instruct}
+      NABU_TTS_MODEL: ${TTS_MODEL-/checkpoints/vits/smoke/model.onnx}
+    volumes:
+      - "${NABU_DATA_DIR:-./data/corpora}:/data/corpora:ro"
+      - "${NABU_CHECKPOINT_DIR:-./runs/checkpoints}:/checkpoints:ro"
+    ports:
+      - "${API_PORT:-8080}:8080"
+    depends_on:
+      data:
+        condition: service_completed_successfully
+      ollama-pull:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  web:
+    build: ./web
+    ports:
+      - "${WEB_PORT:-5173}:80"
+    depends_on:
+      - api
+    restart: unless-stopped

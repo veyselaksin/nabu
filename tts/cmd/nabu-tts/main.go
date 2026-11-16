@@ -3,13 +3,13 @@
 //
 // One utterance, from a transliteration (G2P with a rule set) or from IPA:
 //
-//	nabu-tts --model runs/smoke/model.onnx --ruleset egy-allen -o out.wav "ꜥnḫ"
-//	nabu-tts --model runs/smoke/model.onnx --ipa -o out.wav "ʕnχ"
+//	nabu-tts --model "$NABU_CHECKPOINT_DIR/vits/smoke/model.onnx" --ruleset egy-allen -o out.wav "ꜥnḫ"
+//	nabu-tts --model "$NABU_CHECKPOINT_DIR/vits/smoke/model.onnx" --ipa -o out.wav "ʕnχ"
 //
 // Evaluation samples: render a fixed list for listening and comparing
 // checkpoints (see eval/samples/README.md):
 //
-//	nabu-tts --model runs/full/model.onnx --samples eval/testsets/tts-samples.tsv \
+//	nabu-tts --model "$NABU_CHECKPOINT_DIR/vits/egy/model.onnx" --samples eval/testsets/tts-samples.tsv \
 //	  --out-dir eval/samples --label step-200000
 //
 // Writes <out-dir>/<label>/<id>.wav, <id>.txt and index.tsv, then regenerates

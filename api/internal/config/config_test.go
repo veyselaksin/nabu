@@ -16,7 +16,8 @@ func TestFromEnvDefaults(t *testing.T) {
 	if c.Addr != ":8080" || c.LogLevel != slog.LevelInfo || c.LogFormat != "json" ||
 		c.MaxTextRunes != 2000 || c.RequestTimeout != 10*time.Second || c.RulesDir != "" ||
 		c.TTSModel != "" || c.ORTLibrary != "" || c.TTSThreads != 0 || c.Lexicon != "" ||
-		c.LLMURL != "" || c.TLACorpus != "" || c.TranslateTimeout != 3*time.Minute {
+		c.LLMURL != "" || c.TLACorpus != "" || c.TranslateTimeout != 3*time.Minute ||
+		c.RAGIndex != "" || c.EmbedModel != "qwen3-embedding:0.6b" {
 		t.Errorf("unexpected defaults: %+v", c)
 	}
 }
@@ -28,7 +29,8 @@ func TestFromEnvOverrides(t *testing.T) {
 		"NABU_TTS_MODEL": "/m/model.onnx", "NABU_ORT_LIB": "/lib/libonnxruntime.so.1.31.0", "NABU_TTS_THREADS": "2",
 		"NABU_LEXICON": "/data/lexicon-egy.tsv", "NABU_LLM_URL": "http://127.0.0.1:8090/v1",
 		"NABU_LLM_MODEL": "qwen", "NABU_LLM_API_KEY": "k", "NABU_TLA_CORPUS": "/data/train.jsonl",
-		"NABU_TRANSLATE_TIMEOUT": "90s",
+		"NABU_TRANSLATE_TIMEOUT": "90s", "NABU_RAG_INDEX": "/data/rag/egy", "NABU_EMBED_URL": "http://127.0.0.1:11434/v1",
+		"NABU_EMBED_MODEL": "emb",
 	}))
 	if err != nil {
 		t.Fatal(err)
@@ -37,7 +39,8 @@ func TestFromEnvOverrides(t *testing.T) {
 		LogFormat: "text", MaxTextRunes: 10, RequestTimeout: 2 * time.Second,
 		TTSModel: "/m/model.onnx", ORTLibrary: "/lib/libonnxruntime.so.1.31.0", TTSThreads: 2,
 		Lexicon: "/data/lexicon-egy.tsv", LLMURL: "http://127.0.0.1:8090/v1", LLMModel: "qwen", LLMAPIKey: "k",
-		TLACorpus: "/data/train.jsonl", TranslateTimeout: 90 * time.Second}
+		TLACorpus: "/data/train.jsonl", RAGIndex: "/data/rag/egy", EmbedURL: "http://127.0.0.1:11434/v1", EmbedModel: "emb",
+		TranslateTimeout: 90 * time.Second}
 	if c != want {
 		t.Errorf("got %+v, want %+v", c, want)
 	}

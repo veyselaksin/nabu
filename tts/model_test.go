@@ -11,7 +11,7 @@ import (
 // TestModelIntegration needs a model exported by nabu-tts-export and the ONNX
 // Runtime library. It is skipped unless NABU_TTS_MODEL is set:
 //
-//	NABU_TTS_MODEL=runs/smoke/model.onnx NABU_ORT_LIB=$PWD/.ort/lib/libonnxruntime.1.31.0.dylib \
+//	NABU_TTS_MODEL=runs/checkpoints/vits/smoke/model.onnx NABU_ORT_LIB=$PWD/.ort/lib/libonnxruntime.1.31.0.dylib \
 //	  go test ./tts -run Integration -v
 func TestModelIntegration(t *testing.T) {
 	path := os.Getenv("NABU_TTS_MODEL")

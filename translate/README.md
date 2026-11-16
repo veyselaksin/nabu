@@ -1,7 +1,8 @@
 # translate
 
 English → Middle Egyptian transliteration with a local language model, grounded
-by retrieval from the TLA corpus (RAG). Go module
+by retrieval (RAG) from the open Egyptological corpora: TLA, AES, the AED
+dictionary. Go module
 `github.com/veyselaksin/nabu/translate`, CLI `nabu-translate`, and the API's
 `POST /v1/translate`.
 
@@ -13,32 +14,69 @@ by retrieval from the TLA corpus (RAG). Go module
 
 ## How it works
 
-The TLA's sentences are translated into **German**, not English, so a request
-runs in three steps:
+The corpora translate their sentences into **German**, not English, so a
+request runs in these steps:
 
-1. The model turns the English text into up to 8 German search terms.
-2. A BM25 index over the TLA's German translations retrieves up to 8 sentences:
-   the best match for each term first, then the best overall. A term of 4 or
-   more letters also matches words that start with it ("Brot" matches
-   "Brotes"). Duplicate sentences and sentences of more than 40 words are not
-   indexed.
-3. The model translates the English text, with those sentences as examples
-   (German translation → transliteration, the editor's brackets removed).
+1. The model turns the English text into up to 8 German search terms. A BM25
+   index over the TLA's German translations ranks sentences: the best match
+   for each term first, then the best overall. A term of 4 or more letters
+   also matches words that start with it ("Brot" matches "Brotes").
+2. With the vector index (below), the English text itself is embedded and
+   compared with every corpus sentence and dictionary entry. The embedding
+   model is multilingual, so English finds German translations by meaning,
+   without the keyword step's guesses. Only sentences usable as Middle
+   Egyptian are retrieved (stage "earlier", or undated AES texts; not Late
+   Egyptian or Demotic), and no Coptic dictionary entries. The two sentence
+   rankings are merged by reciprocal-rank fusion (RRF, k = 60). The 8 best
+   sentences become examples, and the 10 nearest dictionary entries (AED:
+   lemma, English and German meaning) become a glossary. Sentences of more
+   than 40 words are not retrieved.
+3. The model translates the English text, with the glossary, the examples
+   (German translation → transliteration, the editor's brackets removed) and
+   the corpus alphabet: every grapheme (a letter with its combining marks, so
+   "i̯" is one) that makes up at least 1/20,000 of the corpus forms. This keeps
+   the TLA's signs and markers and drops stray characters, e.g. a bare "i"
+   (3 times in v18), where the TLA writes "ꞽ" or "i̯".
+4. If the answer still uses graphemes outside that alphabet, the model is asked
+   once to correct those words; the correction is kept only if it has fewer
+   such words (`corrected` in the response). Words that remain list their
+   graphemes in `foreign`: the script and G2P stages would reject them.
 
-Every output word is then looked up among the corpus's transliterated forms.
+Every output word is then looked up among the transliterated forms of the TLA
+and, with the vector index, of every retrievable corpus sentence.
 **Confidence** is the share of output words found there. It is a vocabulary
 check only. A sentence made of real words can still be ungrammatical or mean
 something else.
 
-Responses include the examples and the German search terms, so you can see what
-the model was given.
+Responses include the examples and glossary entries with their record IDs and
+sources (`tla:…`, `aes:…`, `aed:…`), the German search terms, and `retrieval`:
+`hybrid` or `bm25`. If the embedding server fails, translation falls back to
+BM25 and says why in `retrieval_note`.
+
+### The corpus and the vector index
+
+```sh
+make corpus       # fetch all sources (~400 MB) and merge them into $(CORPUS)
+make embed-pull   # qwen3-embedding:0.6b into Ollama (~640 MB, Apache-2.0)
+make rag-index    # embed ~126k sentences and entries into $(RAG_INDEX) (~1 h, resumable)
+```
+
+`nabu-data build-corpus` merges TLA Earlier Egyptian v18, Late Egyptian v19,
+Demotic v18 and AES (converted to the TLA's transliteration conventions,
+intact sentences only, TLA duplicates dropped) into `sentences.jsonl`
+(81,700 sentences), and AED plus the Coptic lexicon into `lexicon.jsonl`
+(44,700 entries). `manifest.json` lists the pinned source files and the
+counts. The index stores 512-dimensional vectors (Qwen3-Embedding is
+Matryoshka-trained, so a prefix is still a good embedding) as float16:
+`vectors.f16`, `docs.jsonl`, `manifest.json`. Search is brute-force cosine in
+memory (~260 MB). There is no vector database.
 
 ## Running it
 
 You need:
 
 - the TLA corpus: `make data-fetch` (CC BY-SA 4.0, checksum-pinned, stays in
-  `data/corpora/`);
+  the local data root; `make paths` prints it);
 - a server implementing the OpenAI chat-completions API. The default is
   [Ollama](https://ollama.com) (MIT) with `qwen3:4b-instruct`
   (Qwen3-4B-Instruct-2507, Apache-2.0):
@@ -71,7 +109,10 @@ make run-api LLM_URL=http://127.0.0.1:8090/v1
 | `NABU_LLM_URL` | API root, e.g. `http://127.0.0.1:11434/v1`. Unset: translation disabled (503). |
 | `NABU_LLM_MODEL` | Model name sent to the server (Ollama needs it; llama-server ignores it). |
 | `NABU_LLM_API_KEY` | Optional bearer token. |
-| `NABU_TLA_CORPUS` | `data/corpora/tla/train.jsonl`; required with `NABU_LLM_URL`. |
+| `NABU_TLA_CORPUS` | `<data root>/tla/train.jsonl` (`make run-api` sets it); required with `NABU_LLM_URL`. |
+| `NABU_RAG_INDEX` | Vector index directory (`make run-api` sets it when the index exists). Unset: BM25 only. |
+| `NABU_EMBED_MODEL` | Embedding model; must be the one the index was built with. Default `qwen3-embedding:0.6b`. |
+| `NABU_EMBED_URL` | Embeddings API root. Default: `NABU_LLM_URL`. |
 | `NABU_TRANSLATE_TIMEOUT` | Default `3m`. Other routes keep `NABU_REQUEST_TIMEOUT`. |
 
 `GET /v1/translator` reports whether translation is configured and whether the
@@ -84,17 +125,18 @@ model server answers.
   Qwen2.5-3B is under a custom license, while Qwen2.5-7B and Qwen3-4B/8B are
   Apache-2.0. Llama and Gemma licenses are not allowed. Nabu never downloads
   or commits weights itself: Ollama or llama.cpp stores them.
-- **TLA** (CC BY-SA 4.0). The corpus is read at startup and never written
-  anywhere. `/v1/translate` returns the example sentences it used, together
-  with the TLA attribution. See [DATA_LICENSES.md](../DATA_LICENSES.md) for
-  the open questions about share-alike.
+- **TLA, AES, AED, Coptic lexicon** (all CC BY-SA 4.0). The merged corpus and
+  the vector index are adaptations: they stay local and are never committed
+  (see the decision in [DATA_LICENSES.md](../DATA_LICENSES.md)).
+  `/v1/translate` returns the examples and dictionary entries it used, with
+  the attribution of every source they came from.
 - Text goes only to the configured `NABU_LLM_URL`.
 
 ## Not done yet
 
-- LoRA fine-tuning (`translate/train/`, Python) on corpus sentence pairs. The
-  pairs are German–Egyptian, so the source language needs a decision first.
-- An evaluation set of held-out expert translations, with chrF.
-- Lemma-level dictionary glosses, which would let retrieval find single words
-  and not only sentences.
-- Sumerian and Hittite.
+- Synthetic English for the corpus sentences (`backfill-en`, translated from
+  the editors' German by the local model), for retrieval and fine-tuning.
+- LoRA fine-tuning (mlx-lm) on the corpus, with retrieval in the training
+  prompts.
+- An evaluation on held-out texts, with chrF.
+- Akkadian, Sumerian and Hittite.

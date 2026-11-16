@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TEI xmlns="http://www.tei-c.org/ns/1.0"><text><body>
+<entry type="hom" xml:id="C1">
+  <form type="lemma" xml:id="CF1"><usg type="geo">S</usg><orth>ⲁ</orth></form>
+  <form xml:id="CF2"><usg type="geo">B</usg><orth>ⲁ</orth></form>
+  <gramGrp><pos>Zahlzeichen</pos></gramGrp>
+  <sense xml:id="CS1"><cit type="translation"><quote xml:lang="de">Eins</quote>
+    <quote xml:lang="en">one</quote><quote xml:lang="fr">un</quote><bibl>CD 1a</bibl></cit></sense>
+</entry>
+<entry type="hom" xml:id="C9">
+  <form type="inflected"><usg type="geo">S</usg><orth>ⲁⲗⲟⲩ</orth></form>
+  <form type="lemma"><usg type="geo">S</usg><usg type="geo">B</usg><orth>ⲁⲗⲟⲩ</orth><gramGrp><pos>Subst. m./f.</pos></gramGrp></form>
+  <sense><cit type="translation"><quote xml:lang="en">child, boy, girl</quote></cit></sense>
+  <sense><cit type="translation"><quote xml:lang="en">  pupil </quote></cit></sense>
+</entry>
+<entry xml:id="C10"><gramGrp><pos>x</pos></gramGrp></entry>
+</body></text></TEI>

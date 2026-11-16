@@ -3,17 +3,18 @@
 name = "nabu-workspace"
 version = "0.0.0"
 requires-python = ">=3.11"
-dependencies = ["nabu-tts", "nabu-eval"]
+dependencies = ["nabu-tts", "nabu-eval", "nabu-llm"]
 
 [tool.uv]
 package = false
 
 [tool.uv.workspace]
-members = ["tts/train", "eval"]
+members = ["tts/train", "eval", "translate/train"]
 
 [tool.uv.sources]
 nabu-tts = { workspace = true }
 nabu-eval = { workspace = true }
+nabu-llm = { workspace = true }
 # Linux: use PyTorch's CPU-only wheels by default. The default PyPI Linux wheels
 # pull in NVIDIA CUDA libraries, which are under NVIDIA's proprietary license,
 # not an OSI license. GPU training installs a CUDA build explicitly; see
@@ -38,7 +39,7 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "ANN"]
 ignore = ["ANN401"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["nabu_tts", "nabu_eval"]
+known-first-party = ["nabu_tts", "nabu_eval", "nabu_llm"]
 
 [tool.ruff.lint.per-file-ignores]
 "*/tests/*" = ["ANN"]
@@ -46,5 +47,5 @@ known-first-party = ["nabu_tts", "nabu_eval"]
 "tts/train/src/nabu_tts/vits/*" = ["ANN", "E501", "E712", "E741", "F811", "F841", "B", "N", "RUF", "SIM"]
 
 [tool.pytest.ini_options]
-testpaths = ["tts/train/tests", "eval/tests"]
+testpaths = ["tts/train/tests", "eval/tests", "translate/train/tests"]
 addopts = ["--import-mode=importlib", "-ra"]

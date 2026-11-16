@@ -1,0 +1,20 @@
+# A few minutes on an M-series Mac: checks that data, model and adapter
+# saving work end to end. Not a useful model.
+run: smoke
+model: mlx-community/Qwen3-4B-Instruct-2507-4bit   # Apache-2.0 (Qwen/Qwen3-4B-Instruct-2507)
+model_revision: 50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b
+data: ${NABU_CHECKPOINT_DIR}/llm/data               # nabu-translate export-sft (make llm-data)
+adapters: ${NABU_CHECKPOINT_DIR}/llm/smoke
+runs: ${NABU_RUNS_DIR}/llm/smoke
+iters: 30
+batch_size: 1
+num_layers: 8
+learning_rate: 1.0e-4
+max_seq_length: 2048
+steps_per_report: 5
+steps_per_eval: 30
+val_batches: 5
+save_every: 30
+grad_checkpoint: true
+seed: 0
+lora: {rank: 8, scale: 20.0, dropout: 0.0}

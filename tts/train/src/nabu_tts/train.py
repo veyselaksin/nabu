@@ -3,8 +3,9 @@
     uv run nabu-tts-train --config tts/train/configs/smoke.yaml
     uv run nabu-tts-train --config tts/train/configs/full.yaml   # resumes automatically
 
-A run lives in ``output_dir``: checkpoints/step_XXXXXXXX.pt, checkpoints/latest.pt,
-config.yaml, samples/. If ``checkpoints/latest.pt`` exists the run resumes from it
+A run writes config.yaml and samples/ to ``output_dir`` and step_XXXXXXXX.pt and
+latest.pt to ``checkpoint_dir`` (default ``output_dir``/checkpoints; see
+nabu_tts.paths for where those live). If ``latest.pt`` exists the run resumes from it
 (same MLflow run); pass --fresh to refuse to resume. Training stops at
 ``train.max_steps``; Ctrl-C saves a checkpoint first.
 """
@@ -115,9 +116,15 @@ class Tracker:
 
         self.mlflow = mlflow
         uri = cfg.mlflow.tracking_uri
+        artifacts = None
         if uri.startswith("sqlite:///"):
-            Path(uri.removeprefix("sqlite:///")).parent.mkdir(parents=True, exist_ok=True)
+            db_dir = Path(uri.removeprefix("sqlite:///")).parent
+            db_dir.mkdir(parents=True, exist_ok=True)
+            # Keep artifacts next to the database, not in ./mlruns of the cwd.
+            artifacts = (db_dir / "mlruns").resolve().as_uri()
         mlflow.set_tracking_uri(uri)
+        if mlflow.get_experiment_by_name(cfg.mlflow.experiment) is None:
+            mlflow.create_experiment(cfg.mlflow.experiment, artifact_location=artifacts)
         mlflow.set_experiment(cfg.mlflow.experiment)
         run = mlflow.start_run(run_id=run_id, run_name=None if run_id else cfg.run_name)
         self.run_id = run.info.run_id
@@ -219,13 +226,14 @@ def evaluate(
 
 def train(cfg: Config, symbols: SymbolTable, fresh: bool) -> int:
     out = Path(cfg.output_dir)
-    ckpt_dir = out / "checkpoints"
+    ckpt_dir = Path(cfg.checkpoint_dir or out / "checkpoints")
     latest = ckpt_dir / "latest.pt"
     resume = latest.exists()
     if resume and fresh:
         print(f"{latest} exists and --fresh was given; use a new output_dir", file=sys.stderr)
         return 2
     out.mkdir(parents=True, exist_ok=True)
+    ckpt_dir.mkdir(parents=True, exist_ok=True)
     seed_everything(cfg.train.seed)
     device = pick_device(cfg.train.device)
 

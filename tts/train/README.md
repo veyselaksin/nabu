@@ -62,10 +62,25 @@ retrained to use new symbols.
 
 Nabu does not download Common Voice. Get each locale from Mozilla (the
 download page asks you to accept its terms, including not trying to identify
-speakers) and extract it, e.g. to `~/cv/cv-corpus-XX/<locale>/` with
+speakers) and extract it under the data root (see below), e.g. to
+`$DATA/commonvoice/cv-corpus-XX/<locale>/` with
 `validated.tsv` and `clips/`.
 
 ### Choose donors: the coverage report
+
+**Where files go.** Datasets, checkpoints and training runs never live in git.
+The commands below use three roots, printed by `uv run nabu-tts-paths` (or
+`make paths`) and set by `NABU_DATA_DIR`, `NABU_CHECKPOINT_DIR` and
+`NABU_RUNS_DIR`. With `MODELS_ROOT` set they default to
+`$MODELS_ROOT/projects/nabu/{datasets,checkpoints,training-runs}`; otherwise to
+the git-ignored `data/corpora/`, `runs/checkpoints/` and `runs/`. Configs refer
+to them as `${NABU_DATA_DIR}` etc. Download Common Voice into the data root too
+(`$DATA/commonvoice/` below), not into your home directory.
+
+```sh
+DATA=$(uv run nabu-tts-paths data); RUNS=$(uv run nabu-tts-paths runs)
+CKPT=$(uv run nabu-tts-paths checkpoints)
+```
 
 Candidate donor locales live in `configs/donors.yaml`. Each Epitran code there
 was verified to exist in Epitran 1.35.3, and each locale was checked against
@@ -76,11 +91,11 @@ the Common Voice languages list. The list is *candidates*, not a decision.
 uv run nabu-tts-coverage --epitran-maps
 
 # Real counts from Common Voice text (vote-filtered, converted with Epitran)
-uv run nabu-tts-coverage --cv kab=~/cv/cv-corpus-XX/kab mt=~/cv/cv-corpus-XX/mt \
-    --out runs/coverage.md --json runs/coverage.json
+uv run nabu-tts-coverage --cv "kab=$DATA/commonvoice/cv-corpus-XX/kab" "mt=$DATA/commonvoice/cv-corpus-XX/mt" \
+    --out "$RUNS/coverage.md" --json "$RUNS/coverage.json"
 
 # Final check on prepared training data
-uv run nabu-tts-coverage --manifest runs/data/*/manifest.jsonl
+uv run nabu-tts-coverage --manifest "$DATA"/tts/*/manifest.jsonl
 ```
 
 The report lists every IPA code point that `g2p/rules/egy-allen.yaml` can emit
@@ -120,7 +135,7 @@ knows those orthographies should check them before they are used.
 ### Prepare a locale
 
 ```sh
-uv run nabu-tts-prepare --cv-dir ~/cv/cv-corpus-XX/kab --out runs/data/kab \
+uv run nabu-tts-prepare --cv-dir "$DATA/commonvoice/cv-corpus-XX/kab" --out "$DATA/tts/kab" \
     --top-speakers 20 --max-clips-per-speaker 2000 --workers 8
 ```
 
@@ -140,7 +155,7 @@ Steps, each with its rejection count in `<out>/report.json`:
    `--min-duration` to `--max-duration` (1–12 s), resample to `--sample-rate`
    (22050) and write 16-bit mono WAV.
 
-Output: `runs/data/<locale>/wavs/*.wav`, `manifest.jsonl` and `report.json`.
+Output: `$DATA/tts/<locale>/wavs/*.wav`, `manifest.jsonl` and `report.json`.
 Manifest lines are JSON with `audio_path` (relative to the manifest),
 `ipa`, `language`, `speaker_id` (a hash, not the Common Voice `client_id`),
 `duration`, plus `text` and `source`.
@@ -162,7 +177,8 @@ uv run nabu-tts-train --config tts/train/configs/full.yaml
 - **Configs** are YAML (`configs/smoke.yaml`, `configs/full.yaml`).
   `--set key=value` overrides a value, e.g. `--set train.max_steps=1000`.
   Unknown keys are errors.
-- **Checkpoints:** `runs/<run>/checkpoints/step_XXXXXXXX.pt` plus `latest.pt`
+- **Checkpoints:** `checkpoint_dir` (`$CKPT/vits/<language>/`, e.g. `vits/smoke`,
+  `vits/egy`) holds `step_XXXXXXXX.pt` plus `latest.pt`
   (the newest `keep_checkpoints` are kept). They hold generator, discriminator,
   optimizers, schedulers, RNG state, the speaker list, data statistics and the
   symbol-table hash.
@@ -170,9 +186,10 @@ uv run nabu-tts-train --config tts/train/configs/full.yaml
   resumes into the same MLflow run (`--fresh` refuses instead). Ctrl-C saves
   a checkpoint first. A resumed run restarts its current epoch's batch order.
 - **MLflow:** losses, gradient norms, learning rate, validation reconstruction
-  mel L1, and validation audio samples as artifacts, all in `runs/mlflow.db`.
+  mel L1, and validation audio samples as artifacts, all in `$RUNS/mlflow.db`
+  (`output_dir`, `$RUNS/<run>/`, holds `config.yaml` and `samples/`).
   View them with:
-  `uvx mlflow ui --backend-store-uri sqlite:///runs/mlflow.db`
+  `uvx mlflow ui --backend-store-uri "sqlite:///$RUNS/mlflow.db"`
   (`uvx` runs the full MLflow UI as a throwaway tool. It is not a project
   dependency, and full `mlflow` pulls in matplotlib, whose license is
   PSF-style.)
@@ -196,7 +213,7 @@ TODO(decision): confirm this is acceptable under the project's license rules.
 ## 3. Export to ONNX and use it from the API
 
 ```sh
-uv run nabu-tts-export --checkpoint runs/full/checkpoints/latest.pt --out runs/full/model.onnx
+uv run nabu-tts-export --checkpoint "$CKPT/vits/egy/latest.pt" --out "$CKPT/vits/egy/model.onnx"
 ```
 
 This writes:
@@ -218,7 +235,7 @@ downloads it, checksum-verified, to `.ort/`):
 
 ```sh
 make ort
-NABU_TTS_MODEL=runs/full/model.onnx make run-api
+NABU_TTS_MODEL="$CKPT/vits/egy/model.onnx" make run-api
 curl -X POST localhost:8080/v1/speak -d '{"text":"ꜥnḫ","ruleset":"egy-allen"}' -o out.wav
 ```
 
@@ -226,7 +243,8 @@ Listen across checkpoints with `make tts-samples MODEL=... LABEL=...` (see
 `eval/samples/README.md`).
 
 **Never commit audio, manifests' WAVs, checkpoints or `.onnx` files.**
-`runs/`, `*.wav`, `*.pt` and `*.onnx` are git-ignored.
+`runs/`, `data/corpora/`, `*.wav`, `*.pt` and `*.onnx` are git-ignored, and
+with `MODELS_ROOT` set nothing heavy is written inside the repository at all.
 
 ## Layout
 

@@ -1,9 +1,11 @@
 # Middle Egyptian, following James P. Allen's historical reconstruction.
 #
 # !!! PLACEHOLDER RULE FILE !!!
-# None of the mappings below have been taken from Allen yet. They are toy
-# values that exist only so the engine, CLI, API and tests have something to
-# run against. Do NOT cite this file or its output as a pronunciation.
+# None of the mappings below have been taken from Allen yet. They are the
+# conventional consonant values used for teaching Egyptian transliteration
+# (not any one scholar's reconstruction), so that the whole TLA alphabet can
+# run through the engine, CLI, API and demo end to end. Allen's own values
+# differ in places. Do NOT cite this file or its output as a pronunciation.
 #
 # A real reconstruction also needs vowels, which Egyptian transliteration does
 # not write; a grapheme-to-phoneme table alone cannot supply them. How Nabu
@@ -19,27 +21,81 @@ name: Middle Egyptian (Allen reconstruction) — PLACEHOLDER
 reference: >-
   PLACEHOLDER (rules not yet taken from this work): Allen, James P. (2013).
   The Ancient Egyptian Language: An Historical Study. Cambridge University Press.
-version: 0.0.0-placeholder
+version: 0.1.0-placeholder
 graphemes:
+  # Consonants, in the conventional order of Egyptological transliteration.
+  # TODO(source): toy value, not from Allen — cite reference.
+  - { match: "ꜣ", ipa: "ʔ" }
+  # TODO(source): toy value, not from Allen — cite reference.
+  - { match: "ꞽ", ipa: "j" }
+  # TODO(source): weak radical, toy value as ꞽ, not from Allen — cite reference.
+  - { match: "i̯", ipa: "j" }
+  # TODO(source): toy value, not from Allen — cite reference.
+  - { match: "y", ipa: "j" }
   # TODO(source): toy value, not from Allen — cite reference.
   - { match: "ꜥ", ipa: "ʕ" }
   # TODO(source): toy value, not from Allen — cite reference.
-  - { match: "ḥ", ipa: "ħ" }
+  - { match: "w", ipa: "w" }
+  # TODO(source): weak radical, toy value as w, not from Allen — cite reference.
+  - { match: "u̯", ipa: "w" }
   # TODO(source): toy value, not from Allen — cite reference.
-  - { match: "ḫ", ipa: "χ" }
-  # TODO(source): toy value, not from Allen — cite reference.
-  - { match: "n", ipa: "n" }
-  # TODO(source): toy value, not from Allen — cite reference.
-  - { match: "t", ipa: "t" }
+  - { match: "b", ipa: "b" }
   # TODO(source): toy value, not from Allen — cite reference.
   - { match: "p", ipa: "p" }
   # TODO(source): toy value, not from Allen — cite reference.
   - { match: "f", ipa: "f" }
   # TODO(source): toy value, not from Allen — cite reference.
+  - { match: "m", ipa: "m" }
+  # TODO(source): toy value, not from Allen — cite reference.
+  - { match: "n", ipa: "n" }
+  # TODO(source): toy value, not from Allen — cite reference.
   - { match: "r", ipa: "r" }
-  # Morpheme boundary in transliteration (e.g. "ꜥnḫ.t"); explicitly silent.
+  # TODO(source): toy value, not from Allen — cite reference.
+  - { match: "h", ipa: "h" }
+  # TODO(source): toy value, not from Allen — cite reference.
+  - { match: "ḥ", ipa: "ħ" }
+  # TODO(source): toy value, not from Allen — cite reference.
+  - { match: "ḫ", ipa: "χ" }
+  # TODO(source): toy value, not from Allen — cite reference.
+  - { match: "ẖ", ipa: "ç" }
+  # TODO(source): toy value, not from Allen — cite reference.
+  - { match: "z", ipa: "z" }
+  # TODO(source): toy value, not from Allen — cite reference.
+  - { match: "s", ipa: "s" }
+  # TODO(source): toy value, not from Allen — cite reference.
+  - { match: "š", ipa: "ʃ" }
+  # TODO(source): toy value, not from Allen — cite reference.
+  - { match: "q", ipa: "q" }
+  # TODO(source): toy value, not from Allen — cite reference.
+  - { match: "k", ipa: "k" }
+  # TODO(source): toy value, not from Allen — cite reference.
+  - { match: "g", ipa: "g" }
+  # TODO(source): toy value, not from Allen — cite reference.
+  - { match: "t", ipa: "t" }
+  # TODO(source): toy value, not from Allen — cite reference.
+  - { match: "ṯ", ipa: "c" }
+  # TODO(source): toy value, not from Allen — cite reference.
+  - { match: "d", ipa: "d" }
+  # TODO(source): toy value, not from Allen — cite reference.
+  - { match: "ḏ", ipa: "ɟ" }
+  # Editorial marks of the TLA transliteration, explicitly silent.
+  # Morpheme boundary in transliteration (e.g. "ꜥnḫ.t").
   # TODO(source): confirm which separators the transliteration standard uses.
   - { match: ".", ipa: "" }
+  # Boundary before suffix pronouns (TLA writes "=f" as its own token).
+  - { match: "=", ipa: "" }
+  # Boundary inside compounds and names (e.g. "nm.tꞽ-nḫt").
+  - { match: "-", ipa: "" }
+  # TLA number markers for plural and dual endings (e.g. "nṯr.PL", "rmn.DU"):
+  # not spelled-out sounds; the ending they stand for is not reconstructed here.
+  # TODO(source): reconstruct the plural/dual endings instead of dropping them.
+  - { match: ".PL", ipa: "" }
+  - { match: ".DU", ipa: "" }
+  # TLA's half ring in forms such as "tʾ" and "rʾ" (a consonant no longer
+  # written in the word).
+  # TODO(source): decide whether it is pronounced; silent for now.
+  - { match: "ʾ", ipa: "" }
 notes: >-
-  Placeholder only. Covers just enough graphemes for the golden tests
-  (ꜥnḫ, ḥtp, nfr). Unknown graphemes raise an error rather than being dropped.
+  Placeholder only. Covers the graphemes of the TLA transliteration (the
+  conventional consonant values) without vowels. Unknown graphemes raise an
+  error rather than being dropped.

@@ -181,3 +181,62 @@ func decodeObject(reply string, dst any) error {
 	}
 	return json.Unmarshal([]byte(reply[start:end+1]), dst)
 }
+
+// Embedder turns texts into vectors. *Client implements it.
+type Embedder interface {
+	Embed(ctx context.Context, texts []string) ([][]float32, error)
+}
+
+// Embed sends one OpenAI-compatible /embeddings request (Ollama serves it)
+// and returns one vector per text, in order.
+func (c *Client) Embed(ctx context.Context, texts []string) ([][]float32, error) {
+	if len(texts) == 0 {
+		return nil, nil
+	}
+	model := c.Model
+	if model == "" {
+		model = "default"
+	}
+	payload, err := json.Marshal(map[string]any{"model": model, "input": texts})
+	if err != nil {
+		return nil, err
+	}
+	req, err := c.newRequest(ctx, http.MethodPost, "/embeddings", bytes.NewReader(payload))
+	if err != nil {
+		return nil, &LLMError{Msg: "bad request", Err: err}
+	}
+	res, err := c.httpClient().Do(req)
+	if err != nil {
+		return nil, &LLMError{Msg: "request failed", Err: err}
+	}
+	defer res.Body.Close()
+	raw, err := io.ReadAll(io.LimitReader(res.Body, 256<<20))
+	if err != nil {
+		return nil, &LLMError{Msg: "reading reply", Err: err}
+	}
+	if res.StatusCode/100 != 2 {
+		return nil, &LLMError{Status: res.StatusCode, Msg: snippet(raw)}
+	}
+	var reply struct {
+		Data []struct {
+			Index     int       `json:"index"`
+			Embedding []float32 `json:"embedding"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(raw, &reply); err != nil {
+		return nil, &LLMError{Msg: "reply is not an embeddings response", Err: err}
+	}
+	out := make([][]float32, len(texts))
+	for _, d := range reply.Data {
+		if d.Index < 0 || d.Index >= len(out) || len(d.Embedding) == 0 {
+			return nil, &LLMError{Msg: fmt.Sprintf("embedding index %d out of range", d.Index)}
+		}
+		out[d.Index] = d.Embedding
+	}
+	for i, v := range out {
+		if v == nil {
+			return nil, &LLMError{Msg: fmt.Sprintf("no embedding for input %d", i)}
+		}
+	}
+	return out, nil
+}

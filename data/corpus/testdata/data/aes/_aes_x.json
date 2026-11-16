@@ -1,0 +1,3 @@
+{"A1": {"text": "TXT1", "date": "MK & SIP", "sentence_translation": "Er lebt.", "token": [{"written_form": "ꜥnḫ", "lemmaID": "38530"}, {"written_form": "=f", "lemmaID": "10050"}]},
+ "A2": {"text": "TXT1", "date": "NK", "sentence_translation": "Der König Jnp,w.", "token": [{"written_form": "nswt", "lemmaID": "88040", "hiero_unicode": "&#x131d3;"}, {"written_form": "Jnp,w", "lemmaID": "33920", "hiero_unicode": "&#x130e2;"}]},
+ "A3": {"text": "TXT2", "date": "NK", "sentence_translation": "", "token": [{"written_form": "x"}]}}

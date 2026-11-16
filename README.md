@@ -159,10 +159,21 @@ go run ./script/cmd/nabu-script "ꜥnḫ"
 
 # Attested spellings: download TLA (CC BY-SA 4.0) and build a local lexicon
 make lexicon
-go run ./script/cmd/nabu-script --lexicon data/corpora/tla/lexicon-egy.tsv "ꜥnḫ"
+go run ./script/cmd/nabu-script --lexicon "$(make -s paths | sed -n 's/^NABU_DATA_DIR=//p')/tla/lexicon-egy.tsv" "ꜥnḫ"
 ```
 
-English → transliteration (needs [Ollama](https://ollama.com), MIT, and the TLA corpus):
+The whole stack (Ollama, API, web demo) with one command. It downloads what is
+missing first (TLA corpus, ONNX Runtime, the ~2.5 GB language model), prefixes
+each service's output like `docker compose`, and Ctrl-C stops everything.
+Needs Go, Node.js and [Ollama](https://ollama.com); set `MODELS_ROOT` in `.env`
+to keep the heavy files on another drive (see [.env.example](.env.example)):
+
+```sh
+./start.sh                  # → http://localhost:5173
+./start.sh --no-llm         # without Ollama: everything except translation
+```
+
+Or step by step. English → transliteration (needs [Ollama](https://ollama.com), MIT, and the TLA corpus):
 
 ```sh
 make run-llm                # in another terminal: ollama serve
@@ -176,11 +187,13 @@ compiler for cgo; trains a throwaway model on synthetic tones in a few minutes o
 
 ```sh
 make py-train tts-smoke ort
-NABU_TTS_MODEL=runs/smoke/model.onnx make run-api
+make run-api                # picks up the smoke voice (make paths shows where it is)
 curl -X POST localhost:8080/v1/speak -d '{"text":"ꜥnḫ","ruleset":"egy-allen"}' -o out.wav
 ```
 
-See [tts/train/README.md](tts/train/README.md) for real training data and GPU training.
+See [tts/train/README.md](tts/train/README.md) for real training data and GPU training,
+and [CONTRIBUTING.md](CONTRIBUTING.md#3-no-corpus-data-audio-or-model-weights-in-git) for
+where datasets, checkpoints and training runs are stored.
 
 ## How we validate
 

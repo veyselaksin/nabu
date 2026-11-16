@@ -1,0 +1,20 @@
+# LoRA on the 4-bit model (QLoRA-style). With batch 4 and ~1,200-token prompts
+# this is ~1.2k examples per 300 iterations; 3000 iterations see ~12k examples.
+run: full
+model: mlx-community/Qwen3-4B-Instruct-2507-4bit   # Apache-2.0 (Qwen/Qwen3-4B-Instruct-2507)
+model_revision: 50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b
+data: ${NABU_CHECKPOINT_DIR}/llm/data
+adapters: ${NABU_CHECKPOINT_DIR}/llm/full
+runs: ${NABU_RUNS_DIR}/llm/full
+iters: 3000
+batch_size: 4
+num_layers: 16
+learning_rate: 5.0e-5
+max_seq_length: 2048
+steps_per_report: 20
+steps_per_eval: 250
+val_batches: 25
+save_every: 250
+grad_checkpoint: true
+seed: 0
+lora: {rank: 16, scale: 20.0, dropout: 0.05}

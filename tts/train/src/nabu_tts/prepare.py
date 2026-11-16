@@ -1,6 +1,7 @@
 """nabu-tts-prepare: one Common Voice locale → filtered WAVs + JSONL manifest.
 
-    uv run nabu-tts-prepare --cv-dir ~/cv/cv-corpus-XX/kab --out runs/data/kab \\
+    DATA=$(uv run nabu-tts-paths data)
+    uv run nabu-tts-prepare --cv-dir "$DATA/commonvoice/cv-corpus-XX/kab" --out "$DATA/tts/kab" \\
         --top-speakers 20 --max-clips-per-speaker 2000 --workers 8
 
 Pipeline (each rejection is counted in <out>/report.json, nothing is dropped silently):

@@ -76,11 +76,11 @@ jobs:
         run: uv run pytest tts/train
       - name: smoke train + export
         run: |
-          uv run nabu-tts-smoke-data --out runs/smoke-data
+          uv run nabu-tts-smoke-data
           uv run nabu-tts-train --config tts/train/configs/smoke.yaml --set train.max_steps=20 --set train.eval_every=20 --set train.checkpoint_every=20
-          uv run nabu-tts-export --checkpoint runs/smoke/checkpoints/latest.pt --out runs/smoke/model.onnx
+          make tts-export
       - name: Go runtime against the exported model
-        run: make test-tts-integration MODEL=runs/smoke/model.onnx
+        run: make test-tts-integration
 
   web:
     runs-on: ubuntu-latest

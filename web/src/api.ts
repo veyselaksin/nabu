@@ -182,29 +182,55 @@ export function translator(): Promise<TranslatorInfo> {
 }
 
 export interface TranslationExample {
+  /** Record ID and source key ("tla", "aes", …); stage when known. */
+  id?: string;
+  source?: string;
+  stage?: string;
   transliteration: string;
-  /** The TLA editors' German translation. */
+  /** The editors' German translation. */
   translation: string;
   date_not_before?: string;
   date_not_after?: string;
+  date?: string;
+  score: number;
+}
+
+/** A dictionary entry given to the model. */
+export interface GlossaryEntry {
+  id: string;
+  source: string;
+  lemma: string;
+  en?: string;
+  de?: string;
+  pos?: string;
   score: number;
 }
 
 export interface TranslateResult {
   input: string;
   transliteration: string;
-  /** Each output word and whether that form occurs in the corpus. */
-  words: { form: string; attested: boolean; count: number }[];
+  /**
+   * Each output word, whether that form occurs in the corpus, and any
+   * graphemes the corpus never writes (such words cannot be rendered or converted).
+   */
+  words: { form: string; attested: boolean; count: number; foreign?: string[] }[];
+  /** The model's first answer used graphemes outside the corpus alphabet and was corrected. */
+  corrected?: boolean;
   /** Share of output words attested in the corpus: a vocabulary check, not accuracy. */
   confidence: number;
   notes?: string;
   /** German search terms used to retrieve the examples. */
   keywords: string[];
   examples: TranslationExample[];
+  /** Dictionary entries found by meaning (only with the vector index). */
+  glossary?: GlossaryEntry[];
+  /** "hybrid" (keywords + meaning) or "bm25" (keywords only). */
+  retrieval?: string;
+  retrieval_note?: string;
   model: string;
   sources: DataSource[];
 }
 
-export function translate(text: string): Promise<TranslateResult> {
-  return request<TranslateResult>("/v1/translate", { method: "POST", body: JSON.stringify({ text, lang: "egy" }) });
+export function translate(text: string, lang: string): Promise<TranslateResult> {
+  return request<TranslateResult>("/v1/translate", { method: "POST", body: JSON.stringify({ text, lang }) });
 }

@@ -35,6 +35,7 @@ nabu-tts-prepare = "nabu_tts.prepare:main"
 nabu-tts-smoke-data = "nabu_tts.smoke_data:main"
 nabu-tts-train = "nabu_tts.train:main"
 nabu-tts-export = "nabu_tts.export:main"
+nabu-tts-paths = "nabu_tts.paths:main"
 
 [build-system]
 requires = ["uv_build>=0.9.5,<0.10"]

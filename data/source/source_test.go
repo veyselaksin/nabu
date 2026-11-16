@@ -45,9 +45,37 @@ func TestDir(t *testing.T) {
 	if got := Dir(getenv, "tla"); got != filepath.Join("data", "corpora", "tla") {
 		t.Errorf("default Dir = %q", got)
 	}
+	env["MODELS_ROOT"] = "/m"
+	if got := Dir(getenv, "tla"); got != filepath.Join("/m", "projects", "nabu", "datasets", "tla") {
+		t.Errorf("MODELS_ROOT Dir = %q", got)
+	}
+	env["NABU_HOME"] = "/h"
+	if got := Dir(getenv, "tla"); got != filepath.Join("/h", "datasets", "tla") {
+		t.Errorf("NABU_HOME Dir = %q", got)
+	}
 	env["NABU_DATA_DIR"] = "/x"
 	if got := Dir(getenv, "tla"); got != filepath.Join("/x", "tla") {
 		t.Errorf("Dir = %q", got)
+	}
+}
+
+func TestCheckRoot(t *testing.T) {
+	env := map[string]string{}
+	getenv := func(k string) string { return env[k] }
+	if err := CheckRoot(getenv); err != nil {
+		t.Errorf("no MODELS_ROOT: %v", err)
+	}
+	env["MODELS_ROOT"] = t.TempDir()
+	if err := CheckRoot(getenv); err != nil {
+		t.Errorf("existing MODELS_ROOT: %v", err)
+	}
+	env["MODELS_ROOT"] = filepath.Join(t.TempDir(), "unmounted")
+	if err := CheckRoot(getenv); err == nil {
+		t.Error("missing MODELS_ROOT: want an error")
+	}
+	env["NABU_DATA_DIR"] = "/x"
+	if err := CheckRoot(getenv); err != nil {
+		t.Errorf("explicit NABU_DATA_DIR: %v", err)
 	}
 }
 

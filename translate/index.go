@@ -14,12 +14,19 @@ import (
 
 // Example is a corpus sentence shown to the model as a reference translation.
 type Example struct {
+	// ID and Source identify the record ("tla:12", "aes:…"); Stage is its
+	// language stage when known.
+	ID     string `json:"id,omitempty"`
+	Source string `json:"source,omitempty"`
+	Stage  string `json:"stage,omitempty"`
 	// Transliteration is the sentence as published (editor's brackets kept).
 	Transliteration string `json:"transliteration"`
 	// Translation is the editors' German translation.
 	Translation   string `json:"translation"`
 	DateNotBefore string `json:"date_not_before,omitempty"`
-	DateNotAfter  string `json:"date_not_after,omitempty"`
+	// Date is a date range or period for records without exact years.
+	Date         string `json:"date,omitempty"`
+	DateNotAfter string `json:"date_not_after,omitempty"`
 }
 
 // Hit is a retrieved example and its relevance score.
@@ -57,6 +64,79 @@ type Index struct {
 	docLen   []int
 	avgLen   float64
 	forms    map[string]int
+	// alphabet holds the graphemes the corpus writes its forms with, most
+	// frequent first; see graphemeAlphabet.
+	alphabet []string
+	inAlpha  map[string]bool
+}
+
+// A grapheme belongs to the corpus alphabet when it makes up at least
+// 1/alphabetShare of all graphemes in the corpus forms. This keeps the
+// signs, separators and markers the TLA uses (ꞽ, i̯, =, .PL, zp-2) and drops
+// stray characters that occur only a handful of times: the TLA writes yod
+// "ꞽ" and the weak radical "i̯", and a bare "i" occurs 3 times in ~290,000
+// graphemes of the v18 corpus.
+const alphabetShare = 20000
+
+// graphemes splits s into base characters with their combining marks
+// (e.g. "i̯" is one grapheme: "i" + U+032F).
+func graphemes(s string) []string {
+	var out []string
+	for _, r := range s {
+		if unicode.Is(unicode.Mn, r) && len(out) > 0 {
+			out[len(out)-1] += string(r)
+			continue
+		}
+		out = append(out, string(r))
+	}
+	return out
+}
+
+// graphemeAlphabet returns the graphemes of forms (weighted by count) that
+// meet the alphabetShare threshold, most frequent first.
+func graphemeAlphabet(forms map[string]int) []string {
+	count := map[string]int{}
+	total := 0
+	for f, n := range forms {
+		for _, g := range graphemes(f) {
+			count[g] += n
+			total += n
+		}
+	}
+	minCount := max(1, total/alphabetShare)
+	var out []string
+	for g, n := range count {
+		if n >= minCount {
+			out = append(out, g)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if count[out[i]] != count[out[j]] {
+			return count[out[i]] > count[out[j]]
+		}
+		return out[i] < out[j]
+	})
+	return out
+}
+
+// Alphabet returns the graphemes the corpus writes its transliterations
+// with, most frequent first.
+func (ix *Index) Alphabet() []string { return ix.alphabet }
+
+// Foreign returns the graphemes of form (after tla.NormalizeForm) that are
+// not in the corpus alphabet, each once, in order of appearance. An empty
+// result means the form is written in the corpus's conventions; it says
+// nothing about whether the word exists (see FormCount).
+func (ix *Index) Foreign(form string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, g := range graphemes(tla.NormalizeForm(form)) {
+		if !ix.inAlpha[g] && !seen[g] {
+			seen[g] = true
+			out = append(out, g)
+		}
+	}
+	return out
 }
 
 // NewIndex indexes sentences. Sentences without a translation are kept in
@@ -85,7 +165,7 @@ func NewIndex(sentences []tla.Sentence) *Index {
 
 		doc := len(ix.examples)
 		ix.examples = append(ix.examples, Example{
-			Transliteration: s.Transliteration, Translation: de,
+			Source: "tla", Transliteration: s.Transliteration, Translation: de,
 			DateNotBefore: s.DateNotBefore, DateNotAfter: s.DateNotAfter,
 		})
 		tokens := tokenize(de)
@@ -104,10 +184,28 @@ func NewIndex(sentences []tla.Sentence) *Index {
 		ix.vocab = append(ix.vocab, t)
 	}
 	sort.Strings(ix.vocab)
+	ix.alphabet = graphemeAlphabet(ix.forms)
+	ix.inAlpha = make(map[string]bool, len(ix.alphabet))
+	for _, g := range ix.alphabet {
+		ix.inAlpha[g] = true
+	}
 	if len(ix.examples) > 0 {
 		ix.avgLen = float64(total) / float64(len(ix.examples))
 	}
 	return ix
+}
+
+// AddForms adds the words of further transliterations to the form
+// dictionary (the vocabulary check). The alphabet stays that of the indexed
+// corpus.
+func (ix *Index) AddForms(translits []string) {
+	for _, t := range translits {
+		for _, w := range strings.Fields(t) {
+			if f := tla.NormalizeForm(w); f != "" {
+				ix.forms[f]++
+			}
+		}
+	}
 }
 
 // Len returns the number of retrievable examples.

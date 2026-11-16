@@ -4,10 +4,13 @@
 //	nabu-data sources                 list sources and their licenses
 //	nabu-data fetch unikemet tla      download pinned files (checksum-verified)
 //	nabu-data build-signs             Unikemet + TLA → script/signs/egy-unikemet-uniliterals.tsv
-//	nabu-data build-lexicon           TLA → $NABU_DATA_DIR/tla/lexicon-egy.tsv
+//	nabu-data build-lexicon           TLA → <root>/tla/lexicon-egy.tsv
+//	nabu-data build-corpus            TLA + AES + AED + Coptic → <root>/corpus/egy/
 //
-// Downloads go to $NABU_DATA_DIR/<source> (default data/corpora/<source>,
-// git-ignored). Run from the repository root.
+// Downloads go to <root>/<source>, where <root> is $NABU_DATA_DIR, else
+// $NABU_HOME/datasets, else $MODELS_ROOT/projects/nabu/datasets when
+// MODELS_ROOT is set, else data/corpora (git-ignored). Run from the
+// repository root.
 package main
 
 import (
@@ -24,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/veyselaksin/nabu/data/corpus"
 	"github.com/veyselaksin/nabu/data/source"
 	"github.com/veyselaksin/nabu/data/tla"
 	"github.com/veyselaksin/nabu/data/unikemet"
@@ -43,8 +47,12 @@ Commands:
   fetch KEY...     download a source's pinned files (e.g. fetch unikemet tla)
   build-signs      build the uniliteral sign list from Unikemet + TLA sign counts
   build-lexicon    build the TLA spelling lexicon (stays local; CC BY-SA 4.0)
+  build-corpus     merge all Egyptian sources into one sentence corpus and lexicon
+                   (stays local; CC BY-SA 4.0)
 
-Files are stored under $NABU_DATA_DIR/<source> (default data/corpora/<source>).
+Files are stored under <root>/<source>. <root> is $NABU_DATA_DIR, else
+$NABU_HOME/datasets, else $MODELS_ROOT/projects/nabu/datasets when MODELS_ROOT
+is set, else data/corpora.
 Run "nabu-data COMMAND -h" for a command's flags.
 `
 
@@ -57,6 +65,12 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout,
 		return 0
 	}
 	var err error
+	if args[0] != "sources" {
+		if err := source.CheckRoot(getenv); err != nil {
+			fmt.Fprintln(stderr, "nabu-data:", err)
+			return 1
+		}
+	}
 	switch args[0] {
 	case "sources":
 		err = cmdSources(stdout, getenv)
@@ -66,6 +80,8 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout,
 		err = cmdBuildSigns(args[1:], getenv, stdout, stderr)
 	case "build-lexicon":
 		err = cmdBuildLexicon(args[1:], getenv, stdout, stderr)
+	case "build-corpus":
+		err = cmdBuildCorpus(args[1:], getenv, stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "nabu-data: unknown command %q\n\n%s", args[0], usage)
 		return 2
@@ -156,8 +172,8 @@ func sourceFile(getenv func(string) string, key, name, override string) (string,
 func cmdBuildSigns(args []string, getenv func(string) string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("build-signs", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	ukPath := fs.String("unikemet", "", "Unikemet.txt (default: $NABU_DATA_DIR/unikemet/Unikemet.txt)")
-	tlaPath := fs.String("tla", "", "TLA train.jsonl used for sign counts (default: $NABU_DATA_DIR/tla/train.jsonl)")
+	ukPath := fs.String("unikemet", "", "Unikemet.txt (default: <root>/unikemet/Unikemet.txt)")
+	tlaPath := fs.String("tla", "", "TLA train.jsonl used for sign counts (default: <root>/tla/train.jsonl)")
 	out := fs.String("out", "script/signs/egy-unikemet-uniliterals.tsv", "output sign list")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -232,8 +248,8 @@ func cmdBuildSigns(args []string, getenv func(string) string, stdout, stderr io.
 func cmdBuildLexicon(args []string, getenv func(string) string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("build-lexicon", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	tlaPath := fs.String("tla", "", "TLA train.jsonl (default: $NABU_DATA_DIR/tla/train.jsonl)")
-	out := fs.String("out", "", "output lexicon (default: $NABU_DATA_DIR/tla/lexicon-egy.tsv)")
+	tlaPath := fs.String("tla", "", "TLA train.jsonl (default: <root>/tla/train.jsonl)")
+	out := fs.String("out", "", "output lexicon (default: <root>/tla/lexicon-egy.tsv)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -303,4 +319,35 @@ func writeFile(path string, data []byte) error {
 		return err
 	}
 	return os.WriteFile(path, data, 0o644)
+}
+
+func cmdBuildCorpus(args []string, getenv func(string) string, stdout, stderr io.Writer) error {
+	fs := flag.NewFlagSet("build-corpus", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	out := fs.String("out", "", "output directory (default: <root>/corpus/egy)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	root := source.Root(getenv)
+	if *out == "" {
+		*out = filepath.Join(root, "corpus", "egy")
+	}
+	if rel, err := filepath.Rel(".", *out); err == nil && !strings.HasPrefix(rel, "..") && !filepath.IsAbs(rel) &&
+		!strings.HasPrefix(rel, filepath.Join("data", "corpora")) {
+		return usageError{"build-corpus: the corpus is CC BY-SA 4.0 and must stay out of the repository (use <root>/corpus)"}
+	}
+	c, err := corpus.Build(root)
+	if err != nil {
+		return err
+	}
+	if err := c.Write(*out); err != nil {
+		return err
+	}
+	m := c.Manifest
+	for _, s := range m.Sources {
+		fmt.Fprintf(stdout, "%-12s %7d records  (duplicates dropped: %d, skipped: %d)\n", s.Key, s.Records, m.Duplicates[s.Key], m.Skipped[s.Key])
+	}
+	fmt.Fprintf(stdout, "sentences: %d %v\nlexicon:   %d\nwrote %s\n", m.Sentences, m.Stages, m.Lexicon, *out)
+	fmt.Fprintln(stdout, "license: CC BY-SA 4.0 (share-alike); keep it local, see DATA_LICENSES.md")
+	return nil
 }

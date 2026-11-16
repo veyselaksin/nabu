@@ -23,6 +23,8 @@ import (
 type Sentence struct {
 	Hieroglyphs     string `json:"hieroglyphs"`
 	Transliteration string `json:"transliteration"`
+	// Lemmatization is "lemmaID|form" per element, space-separated.
+	Lemmatization string `json:"lemmatization"`
 	// Translation is the editors' translation, in German.
 	Translation   string `json:"translation"`
 	DateNotBefore string `json:"dateNotBefore"`

@@ -5,7 +5,7 @@ directory except this README is git-ignored (no audio in git).
 
 ```sh
 # after exporting a checkpoint (see tts/train/README.md):
-make tts-samples MODEL=runs/full/model.onnx LABEL=step-200000
+make tts-samples MODEL="$NABU_CHECKPOINT_DIR/vits/egy/model.onnx" LABEL=step-200000
 open eval/samples/index.html
 ```
 
