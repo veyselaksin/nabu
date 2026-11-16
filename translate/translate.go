@@ -57,12 +57,16 @@ type Options struct {
 	// Exclude, if set, drops matching documents from retrieval (evaluation
 	// uses it to hide a test sentence's own text).
 	Exclude func(*Doc) bool
+	// NoExactGloss turns off the exact dictionary lookup (GlossIndex), so
+	// that the glossary comes from vector search alone. For evaluation.
+	NoExactGloss bool
 }
 
 // Translator translates English into Middle Egyptian transliteration.
 type Translator struct {
 	llm   Chatter
 	index *Index
+	gloss *GlossIndex // nil without a vector index (it holds the lexicon)
 	opts  Options
 }
 
@@ -82,7 +86,17 @@ func New(llm Chatter, index *Index, opts Options) *Translator {
 			opts.Model = "unknown"
 		}
 	}
-	return &Translator{llm: llm, index: index, opts: opts}
+	t := &Translator{llm: llm, index: index, opts: opts}
+	if opts.Vectors != nil {
+		t.gloss = NewGlossIndex(opts.Vectors.Docs(), func(id string) int {
+			aed, ok := strings.CutPrefix(id, "aed:")
+			if !ok || index == nil {
+				return 0
+			}
+			return index.LemmaCount(aed)
+		})
+	}
+	return t
 }
 
 // Index returns the retrieval index.
@@ -101,15 +115,45 @@ type Word struct {
 	// "i" where the TLA writes "ꞽ" or "i̯"). The G2P and script stages
 	// reject such words.
 	Foreign []string `json:"foreign,omitempty"`
+	// Lemma and Gloss are the dictionary entry the corpus most often
+	// analyses this form as, and its meaning: what the word says, whatever
+	// the model intended. Empty when the form is not in the lemmatized corpus.
+	LemmaID string `json:"lemma_id,omitempty"`
+	Lemma   string `json:"lemma,omitempty"`
+	Gloss   string `json:"gloss,omitempty"`
+	// Evidence is the strongest support found for the word: "dictionary"
+	// (its lemma is a dictionary entry matched to a word of the input),
+	// "example" (it occurs in a retrieved example sentence), "corpus" (it
+	// occurs somewhere in the corpus) or "none".
+	Evidence string `json:"evidence"`
 }
+
+// Kinds of evidence for an output word (Word.Evidence).
+const (
+	EvidenceDictionary = "dictionary"
+	EvidenceExample    = "example"
+	EvidenceCorpus     = "corpus"
+	EvidenceNone       = "none"
+)
 
 // Result is a translation and the evidence behind it.
 type Result struct {
 	Input           string `json:"input"`
 	Transliteration string `json:"transliteration"`
 	Words           []Word `json:"words"`
-	// Confidence is the share of Words attested in the corpus, in [0, 1].
+	// Confidence is, in [0, 1], the share of Words backed by what was
+	// retrieved for this request (Evidence "dictionary" or "example") times
+	// the share of the input's content words that are matched in Coverage.
+	// It measures support, not correctness: grammar and word order are not
+	// checked, and a supported word can still be the wrong form.
 	Confidence float64 `json:"confidence"`
+	// AttestedShare is the share of Words that occur anywhere in the corpus.
+	AttestedShare float64 `json:"attested_share"`
+	// Coverage says, for each content word of the input, whether some
+	// output word could be tied to it through the dictionary. An unmatched
+	// word may be missing from the translation, or rendered by a word whose
+	// dictionary entry has no gloss for it. Empty without the vector index.
+	Coverage []Coverage `json:"coverage"`
 	// Notes is the model's own comment on uncertain choices (may be empty).
 	Notes string `json:"notes,omitempty"`
 	// Corrected reports that the model's first answer used graphemes
@@ -129,6 +173,14 @@ type Result struct {
 	Sources       []script.Source `json:"sources"`
 }
 
+// Coverage is one content word of the input and the output words whose
+// dictionary entry has it as a gloss.
+type Coverage struct {
+	Term    string   `json:"term"`
+	Matched bool     `json:"matched"`
+	Words   []string `json:"words,omitempty"`
+}
+
 // Gloss is a dictionary entry given to the model.
 type Gloss struct {
 	ID      string  `json:"id"`
@@ -138,6 +190,12 @@ type Gloss struct {
 	German  string  `json:"de,omitempty"`
 	POS     string  `json:"pos,omitempty"`
 	Score   float64 `json:"score"`
+	// Match is "exact" (Term, a word of the input, equals one of the
+	// entry's glosses) or "similar" (nearest by embedding).
+	Match string `json:"match,omitempty"`
+	Term  string `json:"term,omitempty"`
+	// Count is how often the lemma occurs in the lemmatized corpus.
+	Count int `json:"count"`
 }
 
 // TLASource describes the retrieval corpus for attribution.
@@ -153,13 +211,14 @@ func sourceInfo(key string) script.Source {
 
 const keywordPrompt = `You help search a corpus of Ancient Egyptian texts whose translations are in German.
 Given English text, reply with a JSON object {"keywords": [...]} listing up to 8 German words that a
-German translation of the text would contain: nouns, verbs in the infinitive and adjectives, in their
-base form, without articles. Reply with the JSON object only.`
+German translation of the text would contain: nouns in the nominative singular, verbs in the infinitive
+("geben", never "gibt" or "gab") and adjectives in their base form, without articles. Reply with the JSON object only.`
 
 const translatePrompt = `You translate English into Middle Egyptian (Earlier Egyptian). Write the result in
 the transliteration conventions of the Thesaurus Linguae Aegyptiae, exactly as in the example sentences:
 words separated by single spaces, suffix pronouns as separate words beginning with "=", no hieroglyphs,
-no punctuation, no brackets. Prefer words and constructions that occur in the examples.
+no punctuation, no brackets. For each word of the text, use the dictionary entry listed for it when
+there is one, inflected as in the examples. Prefer words and constructions that occur in the examples.
 Reply with a JSON object {"transliteration": "...", "notes": "..."}, where notes is one short English
 sentence about uncertain choices or words that have no Egyptian equivalent.`
 
@@ -230,14 +289,32 @@ func (t *Translator) TranslateFrom(ctx context.Context, lang, text string, exclu
 // the fine-tuning export share it, so their prompts cannot drift apart.
 func (t *Translator) Prompt(lang, text string, hits []Hit, glossary []Gloss) []Message {
 	var user strings.Builder
-	if len(glossary) > 0 {
+	meaning := func(g Gloss) string {
+		m := g.English
+		if g.German != "" {
+			m = strings.TrimPrefix(m+" / "+g.German, " / ")
+		}
+		return oneLine(m)
+	}
+	var exact, similar []Gloss
+	for _, g := range glossary {
+		if g.Match == MatchExact {
+			exact = append(exact, g)
+		} else {
+			similar = append(similar, g)
+		}
+	}
+	if len(exact) > 0 {
+		user.WriteString("Dictionary entries for words of the text (word → lemma: English / German meaning):\n")
+		for _, g := range exact {
+			fmt.Fprintf(&user, "- %s → %s: %s\n", g.Term, g.Lemma, meaning(g))
+		}
+		user.WriteString("\n")
+	}
+	if len(similar) > 0 {
 		user.WriteString("Dictionary entries (lemma: English / German meaning):\n")
-		for _, g := range glossary {
-			meaning := g.English
-			if g.German != "" {
-				meaning = strings.TrimPrefix(meaning+" / "+g.German, " / ")
-			}
-			fmt.Fprintf(&user, "- %s: %s\n", g.Lemma, oneLine(meaning))
+		for _, g := range similar {
+			fmt.Fprintf(&user, "- %s: %s\n", g.Lemma, meaning(g))
 		}
 		user.WriteString("\n")
 	}
@@ -282,15 +359,87 @@ func (t *Translator) result(text string, ans answer, corrected bool, keywords []
 	if res.Glossary == nil {
 		res.Glossary = []Gloss{}
 	}
-	attested := 0
+	inExamples := map[string]bool{}
+	for _, h := range hits {
+		for _, w := range strings.Fields(promptForm(h.Transliteration)) {
+			inExamples[w] = true
+		}
+	}
+	exactID, exactLemma := map[string]bool{}, map[string][]string{}
+	for _, g := range glossary {
+		if g.Match == MatchExact {
+			exactID[g.ID] = true
+			l := norm.NFC.String(g.Lemma)
+			exactLemma[l] = append(exactLemma[l], g.ID)
+		}
+	}
+	attested, supported := 0, 0
 	for _, w := range strings.Fields(translit) {
 		n := t.index.FormCount(w)
-		res.Words = append(res.Words, Word{Form: w, Attested: n > 0, Count: n, Foreign: t.index.Foreign(w)})
+		word := Word{Form: w, Attested: n > 0, Count: n, Foreign: t.index.Foreign(w), Evidence: EvidenceNone}
+		form := tla.NormalizeForm(w)
+		if id := t.index.FormLemma(w); id != "" {
+			word.LemmaID = "aed:" + id
+			if e, ok := t.gloss.Entry(word.LemmaID); ok {
+				word.Lemma = e.Translit
+				if word.Gloss = e.English; word.Gloss == "" {
+					word.Gloss = e.German
+				}
+			}
+		}
+		if ids := exactLemma[form]; word.Lemma == "" && len(ids) > 0 {
+			// Not in the lemmatized corpus under this form, but written
+			// exactly like a matched dictionary entry.
+			if e, ok := t.gloss.Entry(ids[0]); ok {
+				word.LemmaID, word.Lemma = e.ID, e.Translit
+				if word.Gloss = e.English; word.Gloss == "" {
+					word.Gloss = e.German
+				}
+			}
+		}
+		switch {
+		case exactID[word.LemmaID] || len(exactLemma[form]) > 0:
+			word.Evidence = EvidenceDictionary
+		case inExamples[form]:
+			word.Evidence = EvidenceExample
+		case n > 0:
+			word.Evidence = EvidenceCorpus
+		}
 		if n > 0 {
 			attested++
 		}
+		if word.Evidence == EvidenceDictionary || word.Evidence == EvidenceExample {
+			supported++
+		}
+		res.Words = append(res.Words, word)
 	}
-	res.Confidence = float64(attested) / float64(len(res.Words))
+	res.Confidence = float64(supported) / float64(len(res.Words))
+	res.Coverage = []Coverage{}
+	if t.gloss != nil {
+		matched := 0
+		for _, term := range ContentWords(text) {
+			c := Coverage{Term: term}
+			for _, w := range res.Words {
+				// The word's usual lemma, or a matched dictionary entry
+				// written exactly like the word.
+				ids := append([]string{w.LemmaID}, exactLemma[tla.NormalizeForm(w.Form)]...)
+				for _, id := range ids {
+					if id != "" && t.gloss.Means(id, term) {
+						c.Words = append(c.Words, w.Form)
+						break
+					}
+				}
+			}
+			if c.Matched = len(c.Words) > 0; c.Matched {
+				matched++
+			}
+			res.Coverage = append(res.Coverage, c)
+		}
+		if len(res.Coverage) > 0 {
+			res.Confidence *= float64(matched) / float64(len(res.Coverage))
+		}
+	}
+	res.AttestedShare = float64(attested) / float64(len(res.Words))
 	return res
 }
 
@@ -310,7 +459,7 @@ func (t *Translator) retrieve(ctx context.Context, text string, keywords []strin
 		return t.bm25(keywords, exclude, t.opts.Examples), nil, "bm25", fmt.Sprintf("vector search unavailable: %v", err)
 	}
 	// Fusion gets a longer BM25 list to rank against the vector hits.
-	hits, glossary := t.retrieveVector(vecs[0], t.bm25(keywords, exclude, 2*t.opts.Examples), exclude)
+	hits, glossary := t.retrieveVector(vecs[0], text, keywords, t.bm25(keywords, exclude, 2*t.opts.Examples), exclude)
 	return hits, glossary, "hybrid", ""
 }
 
@@ -332,9 +481,15 @@ func (t *Translator) bm25(keywords []string, exclude func(*Doc) bool, k int) []H
 	return out
 }
 
+// minSimilarGloss is how many glossary places stay reserved for entries
+// found by meaning when exact matches fill the glossary.
+const minSimilarGloss = 3
+
 // retrieveVector searches the vector index with an embedded query and fuses
-// the sentences with the BM25 ranking.
-func (t *Translator) retrieveVector(q []float32, bm25 []Hit, exclude func(*Doc) bool) ([]Hit, []Gloss) {
+// the sentences with the BM25 ranking. The glossary lists the dictionary
+// entries whose gloss is exactly a word of text or a keyword (GlossIndex)
+// first, then the entries nearest by embedding.
+func (t *Translator) retrieveVector(q []float32, text string, keywords []string, bm25 []Hit, exclude func(*Doc) bool) ([]Hit, []Gloss) {
 	k := t.opts.Examples
 	sentences := t.opts.Vectors.Search(q, 2*k, func(d *Doc) bool {
 		return d.Kind == KindSentence && t.stageOK(d.Stage) && (exclude == nil || !exclude(d))
@@ -343,9 +498,28 @@ func (t *Translator) retrieveVector(q []float32, bm25 []Hit, exclude func(*Doc) 
 		return d.Kind == KindLexicon && d.Stage != "coptic" && (exclude == nil || !exclude(d))
 	})
 	var glossary []Gloss
+	seen := map[string]bool{}
+	if !t.opts.NoExactGloss {
+		glossary = t.gloss.Lookup(text, keywords, 2, t.opts.Glossary, exclude)
+		for _, g := range glossary {
+			seen[g.ID] = true
+		}
+	}
+	similar := max(minSimilarGloss, t.opts.Glossary-len(glossary))
 	for _, e := range entries {
+		if similar == 0 {
+			break
+		}
+		if seen[e.ID] {
+			continue
+		}
+		similar--
+		n := 0
+		if aed, ok := strings.CutPrefix(e.ID, "aed:"); ok {
+			n = t.index.LemmaCount(aed)
+		}
 		glossary = append(glossary, Gloss{ID: e.ID, Source: e.Source, Lemma: e.Translit, English: e.English,
-			German: e.German, POS: e.POS, Score: e.Score})
+			German: e.German, POS: e.POS, Score: e.Score, Match: MatchSimilar, Count: n})
 	}
 	return fuse(bm25, sentences, k), glossary
 }

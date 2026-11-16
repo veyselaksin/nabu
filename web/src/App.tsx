@@ -502,6 +502,13 @@ function Translation({ result }: { result: TranslateResult }) {
   const attested = result.words.filter((w) => w.attested).length;
   const foreign = result.words.filter((w) => (w.foreign?.length ?? 0) > 0);
   const share = result.words.length ? attested / result.words.length : 0;
+  const unmatched = (result.coverage ?? []).filter((c) => !c.matched).map((c) => c.term);
+  const evidenceLabel: Record<string, string> = {
+    dictionary: "dictionary entry for a word of your text",
+    example: "occurs in a retrieved example",
+    corpus: "occurs in the corpus, not in what was retrieved",
+    none: "no support found",
+  };
   return (
     <div className="translation">
       <div className="translation-head">
@@ -535,6 +542,27 @@ function Translation({ result }: { result: TranslateResult }) {
           words attested in the corpus
         </span>
       </div>
+      <ul className="glossary" aria-label="What each output word means according to the dictionary">
+        {result.words.map((w, i) => (
+          <li key={i}>
+            <span className="translit-sm" lang="egy-Latn">
+              {w.form}
+            </span>
+            <span>{w.gloss || <span className="muted">not in the lemmatized corpus</span>}</span>
+            <span className="provenance">{evidenceLabel[w.evidence] ?? w.evidence}</span>
+          </li>
+        ))}
+      </ul>
+      {unmatched.length > 0 && (
+        <p className="muted" role="note">
+          No output word could be tied through the dictionary to: <strong>{unmatched.join(", ")}</strong>. These may be
+          missing or mistranslated.
+        </p>
+      )}
+      <p className="muted">
+        Support score {Math.round(result.confidence * 100)}%: how well the chosen words are backed by retrieved
+        evidence and cover your text. It does not check grammar or word order.
+      </p>
       <ul className="legend">
         <li>
           <span className="swatch swatch-attested" /> attested

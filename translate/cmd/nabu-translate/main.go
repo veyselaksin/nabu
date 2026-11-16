@@ -8,6 +8,7 @@
 //	nabu-translate backfill-en              # machine-translate the corpus's German into English
 //	nabu-translate export-sft --out DIR     # fine-tuning data with retrieval in the prompts
 //	nabu-translate eval --data DIR          # chrF etc. on held-out sentences
+//	nabu-translate eval-glossary            # recall of dictionary retrieval on a query set
 //
 // It needs a server implementing the OpenAI chat-completions API (for example
 // llama.cpp's llama-server; see translate/README.md) and the TLA corpus
@@ -46,6 +47,9 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout,
 	}
 	if len(args) > 0 && args[0] == "eval" {
 		return runEval(ctx, args[1:], getenv, stdout, stderr)
+	}
+	if len(args) > 0 && args[0] == "eval-glossary" {
+		return runEvalGlossary(ctx, args[1:], getenv, stdout, stderr)
 	}
 	if len(args) > 0 && args[0] == "export-sft" {
 		return runExportSFT(ctx, args[1:], getenv, stdout, stderr)
@@ -141,7 +145,23 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout,
 			unattested = append(unattested, w.Form)
 		}
 	}
-	fmt.Fprintf(stderr, "confidence %.2f: %d of %d words attested in the TLA corpus (vocabulary check only)\n",
+	for _, w := range res.Words {
+		gloss := w.Gloss
+		if gloss == "" {
+			gloss = "(not in the lemmatized corpus)"
+		}
+		fmt.Fprintf(stderr, "  %-12s %-10s %s\n", w.Form, w.Evidence, gloss)
+	}
+	var unmatched []string
+	for _, c := range res.Coverage {
+		if !c.Matched {
+			unmatched = append(unmatched, c.Term)
+		}
+	}
+	if len(unmatched) > 0 {
+		fmt.Fprintf(stderr, "input words not matched to any output word through the dictionary: %s\n", strings.Join(unmatched, ", "))
+	}
+	fmt.Fprintf(stderr, "confidence %.2f: support for the words chosen and coverage of the input, not correctness (grammar is not checked); %d of %d words occur in the corpus\n",
 		res.Confidence, len(res.Words)-len(unattested), len(res.Words))
 	if len(unattested) > 0 {
 		fmt.Fprintf(stderr, "not attested: %s\n", strings.Join(unattested, " "))
@@ -253,6 +273,100 @@ func runEval(ctx context.Context, args []string, getenv func(string) string, std
 	}
 	fmt.Fprintf(stdout, "%s: n=%d chrF=%.1f exact=%.1f%% attested=%.1f%% foreign=%.1f%% errors=%d (%s retrieval)\nreport: %s\n",
 		rep.Label, rep.N, rep.ChrF, 100*rep.Exact, 100*rep.Attested, 100*rep.Foreign, rep.Errors, rep.Retrieval, *out)
+	return 0
+}
+
+// runEvalGlossary measures dictionary retrieval (see translate.EvaluateGlossary).
+// With --build it first derives the query set from Wiktionary.
+func runEvalGlossary(ctx context.Context, args []string, getenv func(string) string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("nabu-translate eval-glossary", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	root := source.Root(getenv)
+	queriesPath := fs.String("queries", filepath.Join(root, "eval", "egy-gloss-queries.jsonl"), "query set (JSON lines; CC BY-SA 4.0, local only)")
+	build := fs.String("build", "", "derive the query set from this Wiktextract file (e.g. <data>/wiktionary-egy/kaikki.org-dictionary-Egyptian.jsonl) and write it to --queries")
+	minCount := fs.Int("min-count", 20, "with --build: least corpus frequency of an answer lemma")
+	limit := fs.Int("limit", 200, "with --build: number of queries (most frequent answers first)")
+	mode := fs.String("mode", "exact+similar", "exact+similar (as in translation) or similar (vector search only)")
+	out := fs.String("out", "", "report path (default: <runs>/retrieval/glossary-<date>-<mode>.json)")
+	tlaPath := fs.String("tla", envOr(getenv, "NABU_TLA_CORPUS", filepath.Join(source.Dir(getenv, "tla"), "train.jsonl")), "TLA train.jsonl")
+	ragDir := fs.String("rag", envOr(getenv, "NABU_RAG_INDEX", defaultRAG(getenv)), "vector index directory")
+	embedURL := fs.String("embed-url", embedURLDefault(getenv), "embeddings API root (env NABU_EMBED_URL)")
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
+		return 2
+	}
+	fail := func(err error) int { fmt.Fprintln(stderr, "nabu-translate eval-glossary:", err); return 1 }
+	if *mode != "exact+similar" && *mode != "similar" {
+		fmt.Fprintln(stderr, "nabu-translate eval-glossary: --mode is exact+similar or similar")
+		return 2
+	}
+	index, err := translate.LoadIndex(*tlaPath)
+	if err != nil {
+		return fail(err)
+	}
+	vx, err := translate.LoadRAG(*ragDir, index)
+	if err != nil {
+		return fail(err)
+	}
+	if *build != "" {
+		f, err := os.Open(*build)
+		if err != nil {
+			return fail(err)
+		}
+		qs, err := translate.BuildGlossQueries(f, vx.Docs(), func(id string) int {
+			return index.LemmaCount(strings.TrimPrefix(id, "aed:"))
+		}, *minCount, *limit)
+		f.Close()
+		if err != nil {
+			return fail(err)
+		}
+		if err := os.MkdirAll(filepath.Dir(*queriesPath), 0o755); err != nil {
+			return fail(err)
+		}
+		var b strings.Builder
+		enc := json.NewEncoder(&b)
+		enc.SetEscapeHTML(false)
+		for _, q := range qs {
+			_ = enc.Encode(q)
+		}
+		if err := os.WriteFile(*queriesPath, []byte(b.String()), 0o644); err != nil {
+			return fail(err)
+		}
+		fmt.Fprintf(stdout, "wrote %d queries to %s (derived from Wiktionary, CC BY-SA 4.0; keep local)\n", len(qs), *queriesPath)
+	}
+	f, err := os.Open(*queriesPath)
+	if err != nil {
+		return fail(fmt.Errorf("%w (derive it with --build)", err))
+	}
+	queries, err := translate.ReadGlossQueries(f)
+	f.Close()
+	if err != nil {
+		return fail(err)
+	}
+	emb := &translate.Client{BaseURL: *embedURL, Model: vx.Manifest.Model, HTTP: &http.Client{Timeout: 2 * time.Minute}}
+	tr := translate.New(&translate.Client{}, index, translate.Options{Vectors: vx, Embedder: emb, NoExactGloss: *mode == "similar"})
+	rep, err := translate.EvaluateGlossary(ctx, tr, queries, *mode)
+	if err != nil {
+		return fail(err)
+	}
+	if *out == "" {
+		runs := getenv("NABU_RUNS_DIR")
+		if runs == "" {
+			runs = filepath.Join(filepath.Dir(root), "training-runs")
+		}
+		*out = filepath.Join(runs, "retrieval", fmt.Sprintf("glossary-%s-%s.json", rep.Started.Format("20060102-150405"), strings.ReplaceAll(*mode, "+", "-")))
+	}
+	if err := os.MkdirAll(filepath.Dir(*out), 0o755); err != nil {
+		return fail(err)
+	}
+	raw, _ := json.MarshalIndent(rep, "", "  ")
+	if err := os.WriteFile(*out, append(raw, '\n'), 0o644); err != nil {
+		return fail(err)
+	}
+	fmt.Fprintf(stdout, "%s: n=%d recall@1=%.1f%% recall@5=%.1f%% recall@10=%.1f%% MRR=%.3f (%s)\nreport: %s\n",
+		rep.Mode, rep.N, 100*rep.Recall1, 100*rep.Recall5, 100*rep.Recall10, rep.MRR, rep.EmbedModel, *out)
 	return 0
 }
 

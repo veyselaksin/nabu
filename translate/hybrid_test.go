@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -51,11 +52,23 @@ func TestTranslateHybrid(t *testing.T) {
 	if !strings.Contains(strings.Join(ids, ","), "s1") {
 		t.Errorf("examples %v lack s1", ids)
 	}
-	if len(res.Glossary) != 2 || res.Glossary[0].ID != "l2" || res.Glossary[0].English != "beer" {
+	// "beer" is found by its gloss; the rest of the glossary by meaning.
+	if len(res.Glossary) < 2 || res.Glossary[0].ID != "l2" || res.Glossary[0].Match != MatchExact ||
+		res.Glossary[0].Term != "beer" || res.Glossary[1].Match != MatchSimilar {
 		t.Errorf("glossary = %+v", res.Glossary)
 	}
+	// ḥnq.t is backed by the dictionary match, tꞽ only by an example.
+	if res.Words[1].Evidence != EvidenceDictionary || res.Words[0].Evidence != EvidenceExample {
+		t.Errorf("words = %+v", res.Words)
+	}
+	// "beer" is covered by ḥnq.t; nothing ties "bread" to an output word,
+	// which halves the confidence.
+	wantCov := []Coverage{{Term: "bread"}, {Term: "beer", Matched: true, Words: []string{"ḥnq.t"}}}
+	if !reflect.DeepEqual(res.Coverage, wantCov) || res.Confidence != 0.5 {
+		t.Errorf("coverage = %+v, confidence %v", res.Coverage, res.Confidence)
+	}
 	prompt := llm.calls[1][1].Content
-	if !strings.Contains(prompt, "- ḥnq.t: beer / Bier") || strings.Contains(prompt, "ⲟⲉⲓⲕ") {
+	if !strings.Contains(prompt, "- beer → ḥnq.t: beer / Bier") || strings.Contains(prompt, "ⲟⲉⲓⲕ") {
 		t.Errorf("prompt:\n%s", prompt)
 	}
 	var srcs []string
@@ -74,8 +87,19 @@ func TestTranslateHybrid(t *testing.T) {
 			t.Error("excluded s1 retrieved")
 		}
 	}
-	if len(res.Glossary) > 0 && res.Glossary[0].ID == "l2" {
-		t.Error("excluded l2 retrieved")
+	for _, g := range res.Glossary {
+		if g.ID == "l2" {
+			t.Error("excluded l2 retrieved")
+		}
+	}
+
+	// Without the exact lookup the glossary comes from vector search alone.
+	tr.opts.Exclude, tr.opts.NoExactGloss = nil, true
+	res, _ = tr.Translate(context.Background(), "bread and beer")
+	for _, g := range res.Glossary {
+		if g.Match != MatchSimilar {
+			t.Errorf("exact entry with NoExactGloss: %+v", g)
+		}
 	}
 }
 

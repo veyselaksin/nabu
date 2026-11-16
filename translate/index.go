@@ -64,6 +64,10 @@ type Index struct {
 	docLen   []int
 	avgLen   float64
 	forms    map[string]int
+	// lemmaFreq counts the tokens of each TLA lemma ID, and formLemma the
+	// lemma IDs each form was analysed as (from the corpus lemmatization).
+	lemmaFreq map[string]int
+	formLemma map[string]map[string]int
 	// alphabet holds the graphemes the corpus writes its forms with, most
 	// frequent first; see graphemeAlphabet.
 	alphabet []string
@@ -143,7 +147,8 @@ func (ix *Index) Foreign(form string) []string {
 // the form dictionary but cannot be retrieved; duplicate sentences are
 // indexed once.
 func NewIndex(sentences []tla.Sentence) *Index {
-	ix := &Index{postings: map[string][]posting{}, forms: map[string]int{}}
+	ix := &Index{postings: map[string][]posting{}, forms: map[string]int{},
+		lemmaFreq: map[string]int{}, formLemma: map[string]map[string]int{}}
 	seen := map[[2]string]bool{}
 	total := 0
 	for _, s := range sentences {
@@ -151,6 +156,16 @@ func NewIndex(sentences []tla.Sentence) *Index {
 		for _, w := range words {
 			if f := tla.NormalizeForm(w); f != "" {
 				ix.forms[f]++
+			}
+		}
+		for _, el := range strings.Fields(s.Lemmatization) {
+			id, form, ok := strings.Cut(el, "|")
+			if f := tla.NormalizeForm(form); ok && id != "" && f != "" {
+				ix.lemmaFreq[id]++
+				if ix.formLemma[f] == nil {
+					ix.formLemma[f] = map[string]int{}
+				}
+				ix.formLemma[f][id]++
 			}
 		}
 		de := strings.TrimSpace(s.Translation)
@@ -217,6 +232,22 @@ func (ix *Index) Forms() int { return len(ix.forms) }
 // FormCount returns how often a transliterated form occurs in the corpus
 // (after tla.NormalizeForm).
 func (ix *Index) FormCount(form string) int { return ix.forms[tla.NormalizeForm(form)] }
+
+// LemmaCount returns how many corpus tokens were analysed as the TLA lemma
+// with this ID (without the "aed:" prefix).
+func (ix *Index) LemmaCount(id string) int { return ix.lemmaFreq[id] }
+
+// FormLemma returns the TLA lemma ID that form was most often analysed as
+// in the corpus, or "" when the corpus never has the form.
+func (ix *Index) FormLemma(form string) string {
+	best, bestN := "", 0
+	for id, n := range ix.formLemma[tla.NormalizeForm(form)] {
+		if n > bestN || (n == bestN && id < best) {
+			best, bestN = id, n
+		}
+	}
+	return best
+}
 
 // Search returns up to k examples whose German translation best matches the
 // search terms. Each term first contributes its own best example, so that a

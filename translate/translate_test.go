@@ -127,11 +127,12 @@ func TestTranslate(t *testing.T) {
 	if !reflect.DeepEqual(res.Keywords, []string{"Brot", "König"}) {
 		t.Errorf("Keywords = %q", res.Keywords)
 	}
-	wantWords := []Word{{Form: "tʾ", Attested: true, Count: 2}, {Form: "nzw", Attested: true, Count: 2}, {Form: "xyz"}}
+	wantWords := []Word{{Form: "tʾ", Attested: true, Count: 2, Evidence: EvidenceExample},
+		{Form: "nzw", Attested: true, Count: 2, Evidence: EvidenceExample}, {Form: "xyz", Evidence: EvidenceNone}}
 	if !reflect.DeepEqual(res.Words, wantWords) {
 		t.Errorf("Words = %+v, want %+v", res.Words, wantWords)
 	}
-	if res.Confidence != 2.0/3.0 {
+	if res.Confidence != 2.0/3.0 || res.AttestedShare != 2.0/3.0 {
 		t.Errorf("Confidence = %v", res.Confidence)
 	}
 	if got := translits(res.Examples); !reflect.DeepEqual(got, []string{"tʾ", "nzw", "tʾ ḥnq(.t)"}) {
@@ -195,7 +196,8 @@ func TestTranslateCorrection(t *testing.T) {
 		if res.Transliteration != "ꜥnḫ ȝḫ" || !res.Corrected || res.Notes != "fixed" {
 			t.Errorf("result = %+v", res)
 		}
-		want := []Word{{Form: "ꜥnḫ", Attested: true, Count: 4}, {Form: "ȝḫ", Foreign: []string{"ȝ"}}}
+		want := []Word{{Form: "ꜥnḫ", Attested: true, Count: 4, Evidence: EvidenceCorpus},
+			{Form: "ȝḫ", Foreign: []string{"ȝ"}, Evidence: EvidenceNone}}
 		if !reflect.DeepEqual(res.Words, want) {
 			t.Errorf("Words = %+v, want %+v", res.Words, want)
 		}
@@ -237,7 +239,7 @@ func TestTranslateUnparsableKeywords(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(res.Keywords) != 0 || len(res.Examples) != 0 || res.Confidence != 1 || res.Model != "unknown" {
+	if len(res.Keywords) != 0 || len(res.Examples) != 0 || res.Confidence != 0 || res.AttestedShare != 1 || res.Model != "unknown" {
 		t.Errorf("result = %+v", res)
 	}
 	if strings.Contains(llm.calls[1][1].Content, "Example sentences") {

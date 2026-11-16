@@ -172,7 +172,7 @@ func ExportSFT(ctx context.Context, t *Translator, sents []corpus.Sentence, engl
 			var hits []Hit
 			var glossary []Gloss
 			if vecs != nil {
-				hits, glossary = t.retrieveVector(vecs[j], t.bm25(keywords, exclude, 2*t.opts.Examples), exclude)
+				hits, glossary = t.retrieveVector(vecs[j], it.input, nil, t.bm25(keywords, exclude, 2*t.opts.Examples), exclude)
 			} else {
 				hits = t.bm25(keywords, exclude, t.opts.Examples)
 			}

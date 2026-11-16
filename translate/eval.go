@@ -167,7 +167,7 @@ func Evaluate(ctx context.Context, t *Translator, metas []SFTMeta, opts EvalOpti
 			rep.Errors++
 		default:
 			row.Output = res.Transliteration
-			row.Confidence = res.Confidence
+			row.Confidence = res.AttestedShare
 			for _, w := range res.Words {
 				words++
 				if w.Attested {

@@ -204,6 +204,25 @@ export interface GlossaryEntry {
   de?: string;
   pos?: string;
   score: number;
+  /** "exact": `term`, a word of the input, equals one of the entry's glosses; "similar": nearest by meaning. */
+  match?: "exact" | "similar";
+  term?: string;
+  /** How often the lemma occurs in the lemmatized corpus. */
+  count?: number;
+}
+
+/** One output word with what the dictionary says it means and what backs it. */
+export interface TranslatedWord {
+  form: string;
+  attested: boolean;
+  count: number;
+  foreign?: string[];
+  lemma_id?: string;
+  lemma?: string;
+  /** Meaning of the lemma the corpus most often analyses this form as. */
+  gloss?: string;
+  /** Strongest support found: a matched dictionary entry, a retrieved example, the corpus at large, or none. */
+  evidence: "dictionary" | "example" | "corpus" | "none";
 }
 
 export interface TranslateResult {
@@ -213,11 +232,18 @@ export interface TranslateResult {
    * Each output word, whether that form occurs in the corpus, and any
    * graphemes the corpus never writes (such words cannot be rendered or converted).
    */
-  words: { form: string; attested: boolean; count: number; foreign?: string[] }[];
+  words: TranslatedWord[];
   /** The model's first answer used graphemes outside the corpus alphabet and was corrected. */
   corrected?: boolean;
-  /** Share of output words attested in the corpus: a vocabulary check, not accuracy. */
+  /**
+   * Share of output words backed by a retrieved dictionary entry or example, times the share of
+   * input content words matched in `coverage`. Support, not accuracy: grammar is not checked.
+   */
   confidence: number;
+  /** Share of output words that occur anywhere in the corpus. */
+  attested_share?: number;
+  /** For each content word of the input, the output words the dictionary ties to it. */
+  coverage?: { term: string; matched: boolean; words?: string[] }[];
   notes?: string;
   /** German search terms used to retrieve the examples. */
   keywords: string[];
