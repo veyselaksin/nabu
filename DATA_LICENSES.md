@@ -5,6 +5,11 @@ download it into the git-ignored `data/corpora/` directory. This table records
 the terms of each source so that we know what a model trained on it may be
 used for.
 
+> **Registry:** every source that has been evaluated, including rejected ones and
+> those for other languages, is recorded in [`sources/registry.yaml`](sources/registry.yaml)
+> with a summary in [`sources/README.md`](sources/README.md). This table covers the
+> sources the code downloads today.
+>
 > **Status:** Unikemet and TLA have been verified (2026-11-10), TLA Late
 > Egyptian/Demotic, AES, AED and the Coptic lexicon on 2026-11-16, from the
 > license pages linked below. The cuneiform sources are still `TODO(source)`.

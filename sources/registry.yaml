@@ -1,0 +1,825 @@
+# Nabu source registry. One record per source that was evaluated, whatever the decision.
+# decision: ingest | reference-only | hold (needs a check named in notes) | reject.
+# reliability: primary-edition | peer-reviewed | community | uncertain.
+# Licenses were read from license_evidence on the 'retrieved' date; re-check before publishing anything.
+# Sources with registered_in_code: true are pinned in data/source/source.go.
+version: 1
+updated: '2026-11-16'
+sources:
+- key: tla
+  name: 'TLA: Earlier Egyptian original sentences, corpus v18, premium'
+  url: https://huggingface.co/datasets/thesaurus-linguae-aegyptiae/tla-Earlier_Egyptian_original-v18-premium
+  languages:
+  - egy (Old/Middle Egyptian)
+  content:
+  - parallel-text (German)
+  - hieroglyphs
+  - lemmatization
+  license: CC-BY-SA-4.0
+  license_evidence: dataset card on the URL
+  share_alike: true
+  access: bulk download (Hugging Face, pinned revision)
+  reliability: primary-edition
+  decision: ingest
+  reason: Best-curated open Middle Egyptian sentences.
+  notes: 12,773 intact sentences; translations are German, not English. Pinned in data/source/source.go.
+  retrieved: '2026-11-16'
+  registered_in_code: true
+- key: tla-late
+  name: 'TLA: Late Egyptian sentences, corpus v19, premium'
+  url: https://huggingface.co/datasets/thesaurus-linguae-aegyptiae/tla-late_egyptian-v19-premium
+  languages:
+  - egy (Late Egyptian)
+  content:
+  - parallel-text (German)
+  - hieroglyphs
+  license: CC-BY-SA-4.0
+  license_evidence: dataset card on the URL
+  share_alike: true
+  access: bulk download (Hugging Face, pinned revision)
+  reliability: primary-edition
+  decision: ingest
+  reason: Kept out of Middle Egyptian retrieval; needed as a labeled contrast set.
+  notes: 3,606 sentences.
+  retrieved: '2026-11-16'
+  registered_in_code: true
+- key: tla-demotic
+  name: 'TLA: Demotic sentences, corpus v18, premium'
+  url: https://huggingface.co/datasets/thesaurus-linguae-aegyptiae/tla-demotic-v18-premium
+  languages:
+  - egy (Demotic)
+  content:
+  - parallel-text (German)
+  license: CC-BY-SA-4.0
+  license_evidence: dataset card on the URL
+  share_alike: true
+  access: bulk download (Hugging Face, pinned revision)
+  reliability: primary-edition
+  decision: ingest
+  reason: Later stage; labeled and excluded from Middle Egyptian retrieval.
+  notes: 13,383 sentences, no hieroglyphs.
+  retrieved: '2026-11-16'
+  registered_in_code: true
+- key: aes
+  name: 'AES: Ancient Egyptian Sentences'
+  url: https://github.com/simondschweitzer/aes
+  languages:
+  - egy (all pre-Coptic stages)
+  content:
+  - parallel-text (German)
+  - lemmatization
+  - hieroglyphs
+  license: CC-BY-SA-4.0
+  license_evidence: repository README ('All files')
+  share_alike: true
+  access: bulk download (GitHub, pinned commit)
+  reliability: primary-edition
+  decision: ingest
+  reason: Largest open sentence set; same BBAW database as the TLA, 2018 state.
+  notes: 'Older state than the TLA releases, 2018 transliteration conventions (converted). 32,969 merged sentences
+    have no settled language stage: a known contamination risk for Middle Egyptian use. Source dump: https://nbn-resolving.org/urn:nbn:de:kobv:b4-opus4-29190'
+  retrieved: '2026-11-16'
+  registered_in_code: true
+- key: aed
+  name: 'AED: Ancient Egyptian Dictionary 1.0'
+  url: https://simondschweitzer.github.io/aed/
+  languages:
+  - egy
+  content:
+  - lexicon (German, partly English)
+  license: CC-BY-SA-4.0
+  license_evidence: every entry page
+  share_alike: true
+  access: bulk download (GitHub Pages file, pinned commit)
+  reliability: primary-edition
+  decision: ingest
+  reason: The only open lemma list with English glosses keyed to TLA lemma IDs.
+  notes: 33,417 lemmas, 15,875 with English. Parsed from one HTML file.
+  retrieved: '2026-11-16'
+  registered_in_code: true
+- key: coptic-dict
+  name: 'Coptic Dictionary Online: Comprehensive Coptic Lexicon v1.2'
+  url: https://github.com/KELLIA/dictionary
+  languages:
+  - cop
+  content:
+  - lexicon (English, German, French)
+  license: CC-BY-SA-4.0
+  license_evidence: repository README; DOI 10.17169/refubium-2333
+  share_alike: true
+  access: bulk download (GitHub, pinned commit)
+  reliability: peer-reviewed
+  decision: ingest
+  reason: Coptic forms are the main written evidence for Egyptian vowels.
+  notes: 11,283 entries with dialect forms.
+  retrieved: '2026-11-16'
+  registered_in_code: true
+- key: unikemet
+  name: Unicode Unikemet database 18.0.0
+  url: https://www.unicode.org/reports/tr57/
+  languages:
+  - egy
+  content:
+  - sign-list
+  license: Unicode-3.0
+  license_evidence: https://www.unicode.org/license.txt
+  share_alike: false
+  access: bulk download
+  reliability: primary-edition
+  decision: ingest
+  reason: Sign values for hieroglyph rendering.
+  notes: ''
+  retrieved: '2026-11-16'
+  registered_in_code: true
+- key: oraec-coptic-etymologies
+  name: 'ORAEC: internal Egyptian etymologies of Coptic words'
+  url: https://github.com/oraec/coptic_etymologies
+  languages:
+  - egy
+  - cop
+  - egy (Demotic)
+  content:
+  - etymology-map
+  - phonology
+  license: CC0-1.0
+  license_evidence: repository README and LICENSE
+  share_alike: false
+  access: bulk download (GitHub, pinned commit)
+  reliability: community
+  decision: ingest
+  reason: 'Links Egyptian lemma IDs to their Coptic descendants: the basis for a Coptic-informed vocalization.'
+  notes: 2,177 rows; 1,695 carry an Egyptian lemma ID and all 1,695 join to the local AED lexicon, all Coptic IDs
+    join to the local Coptic lexicon (checked 2026-11-16). Covers only words that survived into Coptic. Etymologies
+    are scholarly judgments, some disputed; the file gives no per-row citation.
+  retrieved: '2026-11-16'
+  files:
+  - name: coptic_etymologies.tar.gz
+    url: https://codeload.github.com/oraec/coptic_etymologies/tar.gz/95d6316ab7bf65f8b594d94991f72125866ad843
+    bytes: 18722
+    sha256: 9827679df72b7aee8898e73016912a3bf417c1b94ad3aeef52afe41e8aba7016
+- key: oraec-raw
+  name: ORAEC corpus raw data
+  url: https://github.com/oraec/corpus_raw_data
+  languages:
+  - egy
+  content:
+  - parallel-text (German)
+  - text-metadata
+  - lemma-mappings
+  license: CC-BY-SA-4.0 (texts, hierarchical paths, VÉgA mapping); CC0-1.0 (Trismegistos/Wikidata mappings, statistics)
+  license_evidence: per-file table in the repository README
+  share_alike: true
+  access: bulk download (GitHub, pinned commit)
+  reliability: primary-edition
+  decision: ingest
+  reason: Per-text metadata (corpus path, Trismegistos, Wikidata) to settle the stage of AES texts.
+  notes: Same 2018 BBAW dump as AES, so its sentences duplicate AES; use the metadata, not the text again.
+  retrieved: '2026-11-16'
+  files:
+  - name: corpus_raw_data/ (git clone)
+    url: https://github.com/oraec/corpus_raw_data
+    commit: b83a0ee5fae27a40d4c0a2a9a8c9c2973d45e9cd
+- key: ud-egyptian-ujaen
+  name: UD Egyptian/Pre-Coptic treebank (UJaen)
+  url: https://github.com/UniversalDependencies/UD_Egyptian-UJaen
+  languages:
+  - egy (Old, Middle, Late Egyptian, Demotic)
+  content:
+  - treebank
+  - grammar
+  license: CC-BY-SA-4.0
+  license_evidence: repository README
+  share_alike: true
+  access: bulk download (GitHub, pinned commit)
+  reliability: peer-reviewed
+  decision: ingest
+  reason: Only manually annotated syntax for pre-Coptic Egyptian; evidence for grammar probes.
+  notes: 3,764 sentences (train 2,290, dev 235, test 1,239), each with stage, date, genre and a TLA reference; no
+    translations. Mostly Pyramid Texts (Old Egyptian); Middle Egyptian added from UD 2.19. Uses the Tübingen (Schenkel)
+    transcription, which differs from the TLA conventions and needs a normalizer.
+  retrieved: '2026-11-16'
+  files:
+  - name: UD_Egyptian-UJaen.tar.gz
+    url: https://codeload.github.com/UniversalDependencies/UD_Egyptian-UJaen/tar.gz/1d3ac884bb91fbd227858e701b4225d5c62c534d
+    bytes: 887352
+    sha256: 346d7d5bfd77881489fa775574ecf613cd010a0458b564fa69d56e2c3f319f2f
+- key: wiktionary-egy
+  name: English Wiktionary, Egyptian entries (Wiktextract via kaikki.org)
+  url: https://kaikki.org/dictionary/Egyptian/index.html
+  languages:
+  - egy
+  content:
+  - lexicon (English)
+  - phonology
+  - inflection
+  license: CC-BY-SA-4.0 OR GFDL-1.3 (Wiktionary text)
+  license_evidence: https://en.wiktionary.org/wiki/Wiktionary:Copyrights
+  share_alike: true
+  access: bulk download (per-language JSONL; kaikki marks this file deprecated, the all-languages dump replaces
+    it)
+  reliability: community
+  decision: ingest
+  reason: English glosses, and per-entry IPA labeled as reconstructed or as modern Egyptological reading.
+  notes: '5,459 entries for 4,123 words; 4,321 entries have IPA (4,367 Egyptological readings; about 980 reconstructions
+    each for Old, Middle and Late Egyptian). Community-edited: pronunciations must keep their label and Wiktionary''s
+    own citations; never treat them as consensus. kaikki.org states no license of its own; the terms are Wiktionary''s.
+    Not a versioned URL: pinned by checksum and retrieval date only.'
+  retrieved: '2026-11-16'
+  files:
+  - name: kaikki.org-dictionary-Egyptian.jsonl
+    url: https://kaikki.org/dictionary/Egyptian/kaikki.org-dictionary-Egyptian.jsonl
+    bytes: 17601161
+    sha256: 35a76e6e141d4f39b474aa53fe192dad7c9b785e512bb552dd5cef6231daa1a9
+- key: wiktionary-cop
+  name: English Wiktionary, Coptic entries (Wiktextract via kaikki.org)
+  url: https://kaikki.org/dictionary/Coptic/index.html
+  languages:
+  - cop
+  content:
+  - lexicon (English)
+  - phonology
+  license: CC-BY-SA-4.0 OR GFDL-1.3 (Wiktionary text)
+  license_evidence: https://en.wiktionary.org/wiki/Wiktionary:Copyrights
+  share_alike: true
+  access: bulk download (per-language JSONL, deprecated URL)
+  reliability: community
+  decision: ingest
+  reason: Coptic IPA per dialect for the Coptic-informed pronunciation convention.
+  notes: Community-edited; see wiktionary-egy.
+  retrieved: '2026-11-16'
+- key: ud-coptic-scriptorium
+  name: UD Coptic-Scriptorium treebank
+  url: https://github.com/UniversalDependencies/UD_Coptic-Scriptorium
+  languages:
+  - cop (Sahidic)
+  content:
+  - treebank
+  license: CC-BY-4.0
+  license_evidence: repository README
+  share_alike: false
+  access: bulk download (GitHub, pinned commit)
+  reliability: peer-reviewed
+  decision: ingest
+  reason: Small, clean Coptic text with lemmas; supports the Coptic bridge.
+  notes: ''
+  retrieved: '2026-11-16'
+  files:
+  - name: UD_Coptic-Scriptorium.tar.gz
+    url: https://codeload.github.com/UniversalDependencies/UD_Coptic-Scriptorium/tar.gz/bbb6546254a1d34b90952ea4a7173d15b6b2bb5b
+    bytes: 964994
+    sha256: d37924038916ca88e7365ac085cd3f61de5da5e7081965d99584093b028cc51e
+- key: ramses-trl
+  name: Ramsès automated transliteration software and data (Rosmorduc 2021)
+  url: https://zenodo.org/records/4954597
+  languages:
+  - egy (Late Egyptian)
+  content:
+  - sign-to-transliteration pairs
+  - model
+  license: CC-BY-4.0
+  license_evidence: Zenodo record license field
+  share_alike: false
+  access: bulk download (Zenodo, versioned record)
+  reliability: peer-reviewed
+  decision: ingest
+  reason: The only openly licensed data derived from the Ramsès corpus (Liège).
+  notes: Hieroglyph-to-transliteration training data, Late Egyptian, no translations. Only the 9 MB data archive
+    was downloaded, not the 106 MB network.
+  retrieved: '2026-11-16'
+  files:
+  - name: ramses-trl_2021_05_29.zip
+    url: https://zenodo.org/api/records/4954597/files/ramses-trl_2021_05_29.zip/content
+    bytes: 9394429
+    sha256: 2920016113bdaa4c4027be88e6ccffdf85238d011a54bf5f5a1c500243dbbaa7
+- key: phoible
+  name: PHOIBLE 2.0 phonological inventories
+  url: https://phoible.org/
+  languages:
+  - cross-linguistic
+  content:
+  - phonology
+  license: CC-BY-4.0 (data)
+  license_evidence: repository README at the pinned commit
+  share_alike: false
+  access: bulk download (GitHub, pinned commit)
+  reliability: peer-reviewed
+  decision: ingest
+  reason: 'Which modern languages have each reconstructed phoneme: evidence for TTS donor choice.'
+  notes: Modern languages only; says nothing about ancient pronunciation.
+  retrieved: '2026-11-16'
+  files:
+  - name: phoible.csv
+    url: https://raw.githubusercontent.com/phoible/dev/5f82b9c3fbb0b5c630de20e254c5fdad645e3e56/data/phoible.csv
+    bytes: 26455818
+    sha256: 0816e698563b68ec6a309bab404a06dfb221d4334aa5ffcbc0c18f2bd01844b8
+- key: ramses-online
+  name: Ramsès Online (Université de Liège)
+  url: http://ramses.ulg.ac.be/
+  languages:
+  - egy (Late Egyptian)
+  content:
+  - annotated corpus
+  license: not stated
+  license_evidence: no license found; CNR Open Digital Epigraphy Hub lists it as unidentified
+  share_alike: null
+  access: web interface only
+  reliability: primary-edition
+  decision: reference-only
+  reason: No reuse terms and no bulk access.
+  notes: Verify by writing to the project (S. Polis, J. Winand, Liège).
+  retrieved: '2026-11-16'
+- key: tla-web
+  name: Thesaurus Linguae Aegyptiae website (BBAW/SAW)
+  url: https://thesaurus-linguae-aegyptiae.de/
+  languages:
+  - egy
+  content:
+  - corpus
+  - lexicon
+  license: CC-BY-SA-4.0 (per its published datasets)
+  license_evidence: see tla
+  share_alike: true
+  access: web interface; use the published Hugging Face datasets, do not scrape
+  reliability: primary-edition
+  decision: reference-only
+  reason: The published dumps cover what may be reused; the site itself is the place to check readings.
+  notes: ''
+  retrieved: '2026-11-16'
+- key: st-andrews-corpus
+  name: 'Nederhof: resources on Ancient Egyptian texts (St Andrews)'
+  url: https://sites.cs.st-andrews.ac.uk/people/mn31/egyptian/texts/
+  languages:
+  - egy (Middle Egyptian)
+  content:
+  - parallel-text (English)
+  - hieroglyphs
+  license: not stated
+  license_evidence: no license statement on the page (checked 2026-11-16)
+  share_alike: null
+  access: download page
+  reliability: peer-reviewed
+  decision: hold
+  reason: Would be the best English-aligned Middle Egyptian texts, but the page states no reuse terms.
+  notes: Verify by asking M.-J. Nederhof for the license before any download.
+  retrieved: '2026-11-16'
+- key: peust-1999
+  name: 'Peust, Egyptian Phonology: An Introduction to the Phonology of a Dead Language (1999)'
+  url: https://digi.ub.uni-heidelberg.de/diglit/peust1999
+  languages:
+  - egy
+  - cop
+  content:
+  - phonology (monograph)
+  license: unclear
+  license_evidence: free full text at Heidelberg (DOI 10.11588/diglit.1167); a third-party catalogue labels it Public
+    Domain Mark, which is implausible for a 1999 book and was not confirmed on the Heidelberg page
+  share_alike: null
+  access: online reading
+  reliability: peer-reviewed
+  decision: reference-only
+  reason: Standard open-access reference for consonant values and vocalization; cite it, do not copy it.
+  notes: ''
+  retrieved: '2026-11-16'
+- key: allen-2013
+  name: 'Allen, The Ancient Egyptian Language: An Historical Study (2013)'
+  url: https://doi.org/10.1017/CBO9781139506090
+  languages:
+  - egy
+  content:
+  - phonology
+  - grammar (monograph)
+  license: all rights reserved
+  license_evidence: publisher
+  share_alike: null
+  access: library
+  reliability: peer-reviewed
+  decision: reference-only
+  reason: Named reference of the egy-allen rule file; values may be cited with page numbers, text may not be copied.
+  notes: ''
+  retrieved: '2026-11-16'
+- key: oracc
+  name: 'ORACC: Open Richly Annotated Cuneiform Corpus (JSON open data)'
+  url: https://oracc.museum.upenn.edu/doc/opendata/
+  languages:
+  - sux
+  - akk
+  content:
+  - parallel-text (English)
+  - lexicon (ePSD2)
+  - lemmatization
+  - sign-list
+  license: CC0-1.0 (JSON data); the website text is CC-BY-SA-3.0
+  license_evidence: 'each project archive''s metadata.json: ''This data is released under the CC0 license'' (read
+    from the downloaded archives listed in license_checked_in)'
+  share_alike: false
+  access: bulk download (one JSON zip per project; documented open-data interface; no robots.txt)
+  reliability: primary-edition
+  decision: ingest
+  reason: Main open source for both languages, with English translations and lemmatization.
+  notes: 'Archives are rebuilt upstream without version numbers: pinned by checksum and retrieval date. epsd2/admin/ur3
+    (562 MB) and other large administrative sub-projects were not downloaded.'
+  retrieved: '2026-11-16'
+- key: mtaac-gold
+  name: MTAAC gold corpus (Ur III Sumerian, annotated)
+  url: https://github.com/cdli-gh/mtaac_gold_corpus
+  languages:
+  - sux (Ur III)
+  content:
+  - annotated corpus
+  - morphology
+  license: CC0-1.0
+  license_evidence: repository LICENSE
+  share_alike: false
+  access: bulk download (GitHub, pinned commit)
+  reliability: peer-reviewed
+  decision: ingest
+  reason: Clean gold annotations for evaluation.
+  notes: 'Administrative texts: narrow vocabulary.'
+  retrieved: '2026-11-16'
+  files:
+  - name: mtaac_gold_corpus.tar.gz
+    url: https://codeload.github.com/cdli-gh/mtaac_gold_corpus/tar.gz/66e0643efd230401210e27db353ebb6d7228b1bb
+    bytes: 823200
+    sha256: 2698293080ed8fe6244ec9191010030d2928fd639002ae25d3a05867c22be091
+- key: ud-akkadian-pisandub
+  name: UD Akkadian-PISANDUB
+  url: https://github.com/UniversalDependencies/UD_Akkadian-PISANDUB
+  languages:
+  - akk
+  content:
+  - treebank
+  license: CC-BY-SA-4.0
+  license_evidence: repository README
+  share_alike: true
+  access: bulk download (GitHub, pinned commit)
+  reliability: peer-reviewed
+  decision: ingest
+  reason: Grammar probes.
+  notes: Small set of Babylonian royal inscriptions.
+  retrieved: '2026-11-16'
+  files:
+  - name: UD_Akkadian-PISANDUB.tar.gz
+    url: https://codeload.github.com/UniversalDependencies/UD_Akkadian-PISANDUB/tar.gz/316522e1c1f2ec551df613111a82e00d3eeae3e0
+    bytes: 30582
+    sha256: e36ba766303a91298c7d40362306171ffa959fe186af44de25a71f16a991f276
+- key: ud-akkadian-riao
+  name: UD Akkadian-RIAO
+  url: https://github.com/UniversalDependencies/UD_Akkadian-RIAO
+  languages:
+  - akk
+  content:
+  - treebank
+  license: CC-BY-SA-3.0
+  license_evidence: repository README
+  share_alike: true
+  access: bulk download (GitHub, pinned commit)
+  reliability: peer-reviewed
+  decision: ingest
+  reason: Grammar probes.
+  notes: 1,845 sentences, 22,277 words (per README).
+  retrieved: '2026-11-16'
+  files:
+  - name: UD_Akkadian-RIAO.tar.gz
+    url: https://codeload.github.com/UniversalDependencies/UD_Akkadian-RIAO/tar.gz/e430fa2af76c53adc495951db1219fe489671420
+    bytes: 730270
+    sha256: f018b5255fa3a1c84821fc6b78cb00b7fcaeea026a871a5170a8da5e1b1c80a0
+- key: ud-akkadian-mcong
+  name: UD Akkadian-MCONG
+  url: https://github.com/UniversalDependencies/UD_Akkadian-MCONG
+  languages:
+  - akk (mostly Neo-Assyrian)
+  content:
+  - treebank
+  license: CC-BY-SA-4.0
+  license_evidence: repository README
+  share_alike: true
+  access: bulk download (GitHub, pinned commit)
+  reliability: peer-reviewed
+  decision: ingest
+  reason: Grammar probes.
+  notes: ''
+  retrieved: '2026-11-16'
+  files:
+  - name: UD_Akkadian-MCONG.tar.gz
+    url: https://codeload.github.com/UniversalDependencies/UD_Akkadian-MCONG/tar.gz/d88889cc005223a93f231fb550cf7a6db3420f9b
+    bytes: 1111360
+    sha256: a0d9074bacb7a96d1d3e360de4800d9e875680b5de214424b6dd25a798e317b4
+- key: ebl-fragments
+  name: 'eBL: Transliterated Fragments of the Electronic Babylonian Literature Project'
+  url: https://zenodo.org/records/10018951
+  languages:
+  - akk
+  - sux
+  content:
+  - transliterated corpus
+  license: CC-BY-4.0
+  license_evidence: Zenodo record license field
+  share_alike: false
+  access: bulk download (Zenodo, versioned record v2, 2023-10-18)
+  reliability: primary-edition
+  decision: ingest
+  reason: Large transliterated corpus under the most permissive license of the cuneiform sources.
+  notes: Transliteration only (no translations); a 2023 snapshot, the live platform is newer.
+  retrieved: '2026-11-16'
+  files:
+  - name: README.md
+    url: https://zenodo.org/api/records/10018951/files/README.md/content
+    bytes: 12355
+    sha256: dfac31c7dfc3c9a17d731dae31b973bcc8c8ef1c88f87562565ecfd70c39bf51
+  - name: fragments.json
+    url: https://zenodo.org/api/records/10018951/files/fragments.json/content
+    bytes: 73854507
+    sha256: 4e970d8713315ca9559fb9dfd79956d5b19b1debb9941c22f8bed0339745d753
+- key: wiktionary-akk
+  name: English Wiktionary, Akkadian entries (kaikki.org)
+  url: https://kaikki.org/dictionary/Akkadian/index.html
+  languages:
+  - akk
+  content:
+  - lexicon (English)
+  - phonology
+  license: CC-BY-SA-4.0 OR GFDL-1.3 (Wiktionary text)
+  license_evidence: https://en.wiktionary.org/wiki/Wiktionary:Copyrights
+  share_alike: true
+  access: bulk download (deprecated URL)
+  reliability: community
+  decision: ingest
+  reason: English glosses and IPA.
+  notes: Community-edited.
+  retrieved: '2026-11-16'
+- key: wiktionary-sux
+  name: English Wiktionary, Sumerian entries (kaikki.org)
+  url: https://kaikki.org/dictionary/Sumerian/index.html
+  languages:
+  - sux
+  content:
+  - lexicon (English)
+  - phonology
+  license: CC-BY-SA-4.0 OR GFDL-1.3 (Wiktionary text)
+  license_evidence: https://en.wiktionary.org/wiki/Wiktionary:Copyrights
+  share_alike: true
+  access: bulk download (deprecated URL)
+  reliability: community
+  decision: ingest
+  reason: English glosses and IPA.
+  notes: Community-edited.
+  retrieved: '2026-11-16'
+- key: cdli
+  name: 'CDLI: Cuneiform Digital Library Initiative'
+  url: https://cdli.earth/
+  languages:
+  - sux
+  - akk
+  content:
+  - catalogue
+  - transliterations
+  - images
+  license: no standard license
+  license_evidence: 'https://cdli.earth/terms-of-use: text ''may be freely copied, aggregated and re-used according
+    to common and fair academic practice''; images are non-commercial'
+  share_alike: null
+  access: daily dump on GitHub (cdli-gh/data, about 6 GB)
+  reliability: primary-edition
+  decision: hold
+  reason: Text terms are permissive in spirit but not a license that settles commercial reuse.
+  notes: Verify by asking CDLI whether transliterations may be treated as CC0/CC BY. Images are rejected (non-commercial).
+  retrieved: '2026-11-16'
+- key: etcsl
+  name: 'ETCSL: Electronic Text Corpus of Sumerian Literature'
+  url: https://etcsl.orinst.ox.ac.uk/
+  languages:
+  - sux
+  content:
+  - parallel-text (English)
+  license: CC-BY-NC-SA-3.0
+  license_evidence: Oxford Text Archive record (https://llds.ling-phil.ox.ac.uk/llds/xmlui/handle/20.500.14106/2518)
+  share_alike: true
+  access: bulk download (OTA)
+  reliability: primary-edition
+  decision: reject
+  reason: 'Non-commercial: excluded by project policy.'
+  notes: Much of the same literature is in ORACC epsd2/literary under ORACC's terms.
+  retrieved: '2026-11-16'
+- key: akkademia
+  name: Akkademia (Gutherz et al. 2023 code and data)
+  url: https://github.com/DigitalPasts/Akkademia
+  languages:
+  - akk
+  content:
+  - parallel-text (English)
+  - models
+  license: MIT (repository)
+  license_evidence: GitHub license field
+  share_alike: false
+  access: git clone (about 3.4 GB)
+  reliability: peer-reviewed
+  decision: hold
+  reason: Over 1 GB and its data derives from ORACC, which is already ingested.
+  notes: Download only if the ORACC-derived splits are needed to compare with the published baseline.
+  retrieved: '2026-11-16'
+- key: tlhdig
+  name: 'TLHdig: Thesaurus Linguarum Hethaeorum digitalis, Beta 0.3'
+  url: https://zenodo.org/records/20328284
+  languages:
+  - hit
+  - also Luwian, Palaic, Hattic, Hurrian, Akkadian, Sumerian passages
+  content:
+  - transliterated corpus (XML)
+  license: CC-BY-4.0
+  license_evidence: 'Zenodo record license field (the project website says CC BY-SA: the stricter reading is recorded
+    in notes)'
+  share_alike: false
+  access: bulk download (Zenodo, versioned record)
+  reliability: primary-edition
+  decision: ingest
+  reason: By far the largest open Hittite corpus (the project reports about 98% of published tablets).
+  notes: 'License conflict: Zenodo says CC BY 4.0, the TLHdig site says CC BY-SA. Treat as share-alike until the
+    project confirms. Transliteration only, no translations, beta quality.'
+  retrieved: '2026-11-16'
+- key: ud-hittite-hittb
+  name: UD Hittite-HitTB
+  url: https://github.com/UniversalDependencies/UD_Hittite-HitTB
+  languages:
+  - hit
+  content:
+  - treebank
+  license: CC-BY-SA-4.0
+  license_evidence: repository README
+  share_alike: true
+  access: bulk download (GitHub, pinned commit)
+  reliability: peer-reviewed
+  decision: ingest
+  reason: Grammar probes.
+  notes: Small; sentences from Hoffner and Melchert's tutorial.
+  retrieved: '2026-11-16'
+  files:
+  - name: UD_Hittite-HitTB.tar.gz
+    url: https://codeload.github.com/UniversalDependencies/UD_Hittite-HitTB/tar.gz/791d281316d83c1755900446ad5b1e512ecd73ac
+    bytes: 31361
+    sha256: 06598bdb9ab53dc12f119f6787616bd912d6a65478971e5c2024e874746f87b8
+- key: wiktionary-hit
+  name: English Wiktionary, Hittite entries (kaikki.org)
+  url: https://kaikki.org/dictionary/Hittite/index.html
+  languages:
+  - hit
+  content:
+  - lexicon (English)
+  - phonology
+  license: CC-BY-SA-4.0 OR GFDL-1.3 (Wiktionary text)
+  license_evidence: https://en.wiktionary.org/wiki/Wiktionary:Copyrights
+  share_alike: true
+  access: bulk download (deprecated URL)
+  reliability: community
+  decision: ingest
+  reason: The only openly licensed Hittite-English word list found so far.
+  notes: Community-edited.
+  retrieved: '2026-11-16'
+- key: ediana
+  name: 'eDiAna: Dictionary of the Minor Ancient Anatolian Corpus Languages'
+  url: https://www.ediana.gwi.uni-muenchen.de/
+  languages:
+  - Luwian, Lycian, Lydian, Carian, Palaic and others
+  content:
+  - lexicon
+  - etymology
+  license: CC-BY-SA-4.0
+  license_evidence: project site and citation guidelines
+  share_alike: true
+  access: web interface only; no public bulk download found
+  reliability: peer-reviewed
+  decision: reference-only
+  reason: Comparative material, no bulk access.
+  notes: Ask the project for a dump if needed.
+  retrieved: '2026-11-16'
+- key: toucan-tts
+  name: IMS Toucan / ToucanTTS multilingual checkpoint
+  url: https://github.com/DigitalPhonetics/IMS-Toucan
+  languages:
+  - multilingual
+  content:
+  - tts-model
+  license: Apache-2.0 (code and Flux9665/ToucanTTS weights)
+  license_evidence: GitHub license field; Hugging Face model tags
+  share_alike: false
+  access: Hugging Face (not downloaded)
+  reliability: peer-reviewed
+  decision: hold
+  reason: 'Leading candidate for a pretrained start: permissive, and built for languages without training data.'
+  notes: 'To verify before use: that input can be given as IPA without espeak-ng at runtime, checkpoint size, and
+    inference on Apple Silicon. Its training labels came from a phonemizer; labels are not GPL-encumbered, but that
+    is a policy call recorded in the summary.'
+  retrieved: '2026-11-16'
+- key: mms-tts
+  name: Meta MMS-TTS
+  url: https://huggingface.co/facebook/mms-tts-eng
+  languages:
+  - multilingual
+  content:
+  - tts-model
+  license: CC-BY-NC-4.0
+  license_evidence: Hugging Face model tags
+  share_alike: false
+  access: '-'
+  reliability: peer-reviewed
+  decision: reject
+  reason: Non-commercial.
+  notes: ''
+  retrieved: '2026-11-16'
+- key: f5-tts
+  name: F5-TTS
+  url: https://huggingface.co/SWivid/F5-TTS
+  languages:
+  - multilingual
+  content:
+  - tts-model
+  license: CC-BY-NC-4.0
+  license_evidence: Hugging Face model tags
+  share_alike: false
+  access: '-'
+  reliability: peer-reviewed
+  decision: reject
+  reason: Non-commercial weights.
+  notes: ''
+  retrieved: '2026-11-16'
+- key: xtts-v2
+  name: Coqui XTTS-v2
+  url: https://huggingface.co/coqui/XTTS-v2
+  languages:
+  - multilingual
+  content:
+  - tts-model
+  license: custom ('other' on Hugging Face)
+  license_evidence: Hugging Face model tags
+  share_alike: false
+  access: '-'
+  reliability: community
+  decision: reject
+  reason: 'Custom model license: excluded by project policy.'
+  notes: ''
+  retrieved: '2026-11-16'
+- key: wiesenbach-riezler-2019
+  name: 'Wiesenbach & Riezler, Multi-Task Modeling of Phonographic Languages: Translating Middle Egyptian Hieroglyphs
+    (IWSLT 2019)'
+  url: https://aclanthology.org/2019.iwslt-1.33.pdf
+  languages:
+  - egy
+  content:
+  - paper
+  license: CC-BY-4.0 (paper)
+  license_evidence: Zenodo record 3524924
+  share_alike: false
+  access: paper
+  reliability: peer-reviewed
+  decision: reference-only
+  reason: First NMT on TLA data; transliteration as an intermediate task helps.
+  notes: ''
+  retrieved: '2026-11-16'
+- key: gutherz-2023
+  name: Gutherz et al., Translating Akkadian to English with neural machine translation (PNAS Nexus 2023)
+  url: https://academic.oup.com/pnasnexus/article/2/5/pgad096/7147349
+  languages:
+  - akk
+  content:
+  - paper
+  license: see publisher
+  license_evidence: publisher page
+  share_alike: null
+  access: paper
+  reliability: peer-reviewed
+  decision: reference-only
+  reason: Baseline for Akkadian; reports fluent but wrong output on literary texts, the failure this project must
+    flag.
+  notes: ''
+  retrieved: '2026-11-16'
+- key: rag-middle-egyptian-2025
+  name: RAG-enhanced translation of Middle Egyptian with a Coptic-Egyptian lexicon (NLP4DH 2025)
+  url: https://preview.aclanthology.org/moar-dois/2025.nlp4dh-1.4.pdf
+  languages:
+  - egy
+  content:
+  - paper
+  license: see ACL Anthology
+  license_evidence: ACL Anthology
+  share_alike: null
+  access: paper
+  reliability: peer-reviewed
+  decision: reference-only
+  reason: Closest prior work to Nabu's design.
+  notes: Seen in search results only; title, authors and results not yet read from the paper itself.
+  retrieved: '2026-11-16'
+- key: toutou-2026
+  name: 'Toutou, Harb & Basta: reproducibility study of TLA-based hieroglyph translation (arXiv 2605.07453)'
+  url: https://arxiv.org/html/2605.07453
+  languages:
+  - egy
+  content:
+  - paper
+  license: CC-BY-4.0 (paper)
+  license_evidence: arXiv page
+  share_alike: false
+  access: paper
+  reliability: uncertain
+  decision: reference-only
+  reason: Argues published BLEU on TLA is inflated by formulaic repetition and releases a decontaminated test set.
+  notes: Preprint, seen in search results only; exact title and figures not yet verified against the paper.
+  retrieved: '2026-11-16'
