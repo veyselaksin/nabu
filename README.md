@@ -92,7 +92,7 @@ There are **no non-commercial (NC) models or weights** anywhere in the project.
 | Embeddings          | Qwen3-Embedding                                 | Apache-2.0     |
 | LLM inference       | Ollama or llama.cpp (any OpenAI-compatible server) | MIT         |
 | TTS inference       | ONNX Runtime via onnxruntime_go                 | MIT            |
-| Vector store        | PostgreSQL + pgvector                           | PostgreSQL     |
+| Vector store        | Flat file searched in process (see [docs/knowledge-base-design.md](docs/knowledge-base-design.md)) | Apache-2.0 |
 | HTTP router         | chi                                             | MIT            |
 | Training            | PyTorch, PEFT, TRL                              | BSD-3, Apache-2.0, Apache-2.0 |
 | TTS model code      | VITS, adapted from jaywalnut310/vits            | MIT            |
