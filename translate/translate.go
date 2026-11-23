@@ -33,7 +33,10 @@ var (
 	ErrEmptyInput   = errors.New("translate: nothing to translate")
 	ErrInvalidUTF8  = errors.New("translate: text is not valid UTF-8")
 	ErrModelOutput  = errors.New("translate: the language model returned no usable transliteration")
-	errNoTranslator = errors.New("translate: nil Translator")
+	// ErrModelOverride is returned when a per-request model was requested but
+	// the configured backend cannot switch models.
+	ErrModelOverride = errors.New("translate: the configured backend cannot switch models")
+	errNoTranslator  = errors.New("translate: nil Translator")
 )
 
 // Options configures a Translator.
@@ -119,6 +122,29 @@ sentence about uncertain choices or words that have no Egyptian equivalent.`
 
 // Translate translates English text.
 func (t *Translator) Translate(ctx context.Context, text string) (*Result, error) {
+	return t.translate(ctx, text)
+}
+
+// TranslateModel is Translate with a specific backend model, for servers that
+// host several pulled models (e.g. Ollama). An empty model uses the configured
+// default. It requires the backend to be a *Client.
+func (t *Translator) TranslateModel(ctx context.Context, text, model string) (*Result, error) {
+	if model == "" {
+		return t.Translate(ctx, text)
+	}
+	c, ok := t.llm.(*Client)
+	if !ok {
+		return nil, ErrModelOverride
+	}
+	cc := *c
+	cc.Model = model
+	cp := *t
+	cp.llm = &cc
+	cp.opts.Model = model
+	return cp.translate(ctx, text)
+}
+
+func (t *Translator) translate(ctx context.Context, text string) (*Result, error) {
 	if t == nil {
 		return nil, errNoTranslator
 	}
@@ -149,7 +175,7 @@ func (t *Translator) Translate(ctx context.Context, text string) (*Result, error
 	reply, err := t.llm.Chat(ctx, []Message{
 		{Role: "system", Content: translatePrompt},
 		{Role: "user", Content: user.String()},
-	}, ChatOptions{JSON: true, MaxTokens: 400})
+	}, ChatOptions{JSON: true, MaxTokens: 2048})
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +222,7 @@ func (t *Translator) keywords(ctx context.Context, text string) ([]string, error
 	reply, err := t.llm.Chat(ctx, []Message{
 		{Role: "system", Content: keywordPrompt},
 		{Role: "user", Content: text},
-	}, ChatOptions{JSON: true, MaxTokens: 100})
+	}, ChatOptions{JSON: true, MaxTokens: 512})
 	if err != nil {
 		return nil, err
 	}

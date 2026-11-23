@@ -41,6 +41,7 @@ export function App() {
   const ids = { english: useId(), translateHint: useId(), text: useId(), ruleset: useId(), speakHint: useId() };
   const [english, setEnglish] = useState("");
   const [translatorInfo, setTranslatorInfo] = useState<TranslatorInfo | null>(null);
+  const [translationModel, setTranslationModel] = useState("");
   const [translation, setTranslation] = useState<TranslateResult | null>(null);
   const [translateError, setTranslateError] = useState<string | null>(null);
   const [rulesets, setRulesets] = useState<RulesetInfo[]>([]);
@@ -73,6 +74,18 @@ export function App() {
       cancelled = true;
     };
   }, []);
+
+  // Pick a default model once the server's model list arrives: the configured
+  // default if it is listed, otherwise the first advertised model.
+  useEffect(() => {
+    const models = translatorInfo?.models;
+    if (!models || models.length === 0) return;
+    setTranslationModel((cur) => {
+      if (cur && models.includes(cur)) return cur;
+      const def = translatorInfo?.model;
+      return def && models.includes(def) ? def : (models[0] ?? "");
+    });
+  }, [translatorInfo]);
 
   // Release the previous audio blob whenever a new one replaces it (and on unmount).
   useEffect(() => {
@@ -120,7 +133,7 @@ export function App() {
     setTranslateError(null);
     let res: TranslateResult;
     try {
-      res = await translate(english);
+      res = await translate(english, translationModel || undefined);
     } catch (err) {
       setTranslation(null);
       setTranslateError(message(err));
@@ -188,6 +201,20 @@ export function App() {
           placeholder="May the king live"
         />
         <div className="actions">
+          {(translatorInfo?.models?.length ?? 0) > 0 && (
+            <select
+              value={translationModel}
+              onChange={(e) => setTranslationModel(e.target.value)}
+              disabled={busy !== null}
+              aria-label="Translation model"
+            >
+              {translatorInfo!.models!.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          )}
           <span className="tooltip" data-tooltip={translateAvailable ? undefined : "Translation unavailable"}>
             <button type="submit" disabled={!canTranslate} aria-describedby={ids.translateHint}>
               {busy === "translate" ? "Translating…" : "Translate"}

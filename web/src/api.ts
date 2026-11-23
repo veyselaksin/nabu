@@ -175,6 +175,8 @@ export interface TranslatorInfo {
   available: boolean;
   message?: string;
   model?: string;
+  /** Model names the LLM server advertises (e.g. pulled Ollama models). */
+  models?: string[];
 }
 
 export function translator(): Promise<TranslatorInfo> {
@@ -205,6 +207,9 @@ export interface TranslateResult {
   sources: DataSource[];
 }
 
-export function translate(text: string): Promise<TranslateResult> {
-  return request<TranslateResult>("/v1/translate", { method: "POST", body: JSON.stringify({ text, lang: "egy" }) });
+export function translate(text: string, model?: string): Promise<TranslateResult> {
+  return request<TranslateResult>("/v1/translate", {
+    method: "POST",
+    body: JSON.stringify({ text, lang: "egy", ...(model ? { model } : {}) }),
+  });
 }

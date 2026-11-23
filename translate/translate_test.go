@@ -187,12 +187,63 @@ func TestTranslateErrors(t *testing.T) {
 	}
 }
 
+func TestTranslateModel(t *testing.T) {
+	var gotModels []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Model    string `json:"model"`
+			Messages []struct {
+				Content string `json:"content"`
+			} `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		gotModels = append(gotModels, req.Model)
+		content := `{"transliteration": "ꜥnḫ", "notes": ""}`
+		if strings.Contains(req.Messages[0].Content, `"keywords"`) {
+			content = `{"keywords": ["Leben"]}`
+		}
+		out, _ := json.Marshal(map[string]any{
+			"choices": []any{map[string]any{"message": map[string]any{"role": "assistant", "content": content}}},
+		})
+		_, _ = w.Write(out)
+	}))
+	defer srv.Close()
+
+	tr := New(&Client{BaseURL: srv.URL + "/v1", Model: "default-model"}, fixtureIndex(t), Options{})
+
+	res, err := tr.TranslateModel(context.Background(), "life", "other-model")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Model != "other-model" || res.Transliteration != "ꜥnḫ" {
+		t.Errorf("result = %+v", res)
+	}
+	if want := []string{"other-model", "other-model"}; !reflect.DeepEqual(gotModels, want) {
+		t.Errorf("models sent = %q, want %q (keywords + translation calls)", gotModels, want)
+	}
+
+	gotModels = nil
+	if _, err := tr.TranslateModel(context.Background(), "life", ""); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"default-model", "default-model"}; !reflect.DeepEqual(gotModels, want) {
+		t.Errorf("models sent = %q, want %q", gotModels, want)
+	}
+
+	if _, err := New(&fakeLLM{}, fixtureIndex(t), Options{}).TranslateModel(context.Background(), "life", "x"); !errors.Is(err, ErrModelOverride) {
+		t.Errorf("err = %v, want %v", err, ErrModelOverride)
+	}
+}
+
 func TestClient(t *testing.T) {
 	var got map[string]any
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/v1/models" && r.Method == http.MethodGet:
-			_, _ = io.WriteString(w, `{"data": []}`)
+			_, _ = io.WriteString(w, `{"data": [{"id":"b-model"},{"id":"a-model"},{"id":""}]}`)
 		case r.URL.Path == "/v1/chat/completions" && r.Method == http.MethodPost:
 			if r.Header.Get("Authorization") != "Bearer k" {
 				http.Error(w, "unauthorized", http.StatusUnauthorized)
@@ -219,6 +270,13 @@ func TestClient(t *testing.T) {
 	}
 	if err := c.Ping(context.Background()); err != nil {
 		t.Errorf("Ping: %v", err)
+	}
+	models, err := c.Models(context.Background())
+	if err != nil {
+		t.Fatalf("Models: %v", err)
+	}
+	if want := []string{"a-model", "b-model"}; !reflect.DeepEqual(models, want) {
+		t.Errorf("Models = %q, want %q", models, want)
 	}
 
 	c.APIKey = ""

@@ -36,9 +36,32 @@ func (f *fakeTranslator) Translate(ctx context.Context, text string) (*translate
 
 func (f *fakeTranslator) Model() string { return "fake-model" }
 
+// fakeModelTranslator also implements ModelTranslator and records the model
+// each request asked for.
+type fakeModelTranslator struct {
+	fakeTranslator
+	gotModel string
+}
+
+func (f *fakeModelTranslator) TranslateModel(ctx context.Context, text, model string) (*translate.Result, error) {
+	f.gotModel = model
+	return f.Translate(ctx, text)
+}
+
 type fakePing struct{ err error }
 
 func (p fakePing) Ping(context.Context) error { return p.err }
+
+// fakePingLister is a Pinger that also implements ModelLister.
+type fakePingLister struct {
+	pingErr   error
+	models    []string
+	modelsErr error
+}
+
+func (p fakePingLister) Ping(context.Context) error { return p.pingErr }
+
+func (p fakePingLister) Models(context.Context) ([]string, error) { return p.models, p.modelsErr }
 
 func newTranslateServer(t *testing.T, tr Translator, ping Pinger, timeout time.Duration) *httptest.Server {
 	t.Helper()
@@ -73,6 +96,7 @@ func TestTranslate(t *testing.T) {
 	}{
 		{"ok", ok, `{"text":"life"}`, 200, ""},
 		{"ok with lang", ok, `{"text":"life","lang":"egy"}`, 200, ""},
+		{"model not supported", ok, `{"text":"life","model":"x"}`, 400, "invalid_request"},
 		{"other language", ok, `{"text":"life","lang":"sux"}`, 400, "unsupported_language"},
 		{"too long", ok, `{"text":"` + strings.Repeat("a", 21) + `"}`, 413, "text_too_long"},
 		{"bad json", ok, `{"text":1}`, 400, "invalid_json"},
@@ -129,6 +153,65 @@ func TestTranslator(t *testing.T) {
 			}
 			if msg, _ := body["message"].(string); !tc.available && !strings.Contains(msg, "make run-llm") {
 				t.Errorf("message = %q", msg)
+			}
+		})
+	}
+}
+
+func TestTranslateModelSelection(t *testing.T) {
+	tr := &fakeModelTranslator{fakeTranslator: fakeTranslator{res: &translate.Result{
+		Transliteration: "ꜥnḫ", Words: []translate.Word{{Form: "ꜥnḫ", Attested: true, Count: 3}},
+		Confidence: 1, Examples: []translate.Hit{}, Model: "chosen",
+		Sources: []script.Source{translate.TLASource()},
+	}}}
+	ts := newTranslateServer(t, tr, nil, time.Minute)
+
+	status, body := do(t, ts, "POST", "/v1/translate", `{"text":"life","model":"chosen"}`)
+	if status != 200 || body["model"] != "chosen" {
+		t.Fatalf("got %d %v", status, body)
+	}
+	if tr.gotModel != "chosen" {
+		t.Errorf("TranslateModel got %q, want %q", tr.gotModel, "chosen")
+	}
+
+	tr.gotModel = ""
+	do(t, ts, "POST", "/v1/translate", `{"text":"life"}`)
+	if tr.gotModel != "" {
+		t.Errorf("TranslateModel called with %q on a request without model", tr.gotModel)
+	}
+}
+
+func TestTranslatorModels(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		ping      Pinger
+		want      []string
+		wantField bool
+	}{
+		{"ping only", fakePing{}, nil, false},
+		{"lister", fakePingLister{models: []string{"b-model", "a-model"}}, []string{"b-model", "a-model"}, true},
+		{"lister error", fakePingLister{modelsErr: errors.New("boom")}, nil, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ts := newTranslateServer(t, &fakeTranslator{}, tc.ping, time.Minute)
+			status, body := do(t, ts, "GET", "/v1/translator", "")
+			if status != 200 || body["available"] != true {
+				t.Fatalf("got %d %v", status, body)
+			}
+			got, has := body["models"]
+			if has != tc.wantField {
+				t.Fatalf("models field present = %v, want %v (%v)", has, tc.wantField, body)
+			}
+			if tc.wantField {
+				list, _ := got.([]any)
+				if len(list) != len(tc.want) {
+					t.Fatalf("models = %v, want %v", got, tc.want)
+				}
+				for i, m := range tc.want {
+					if list[i] != m {
+						t.Fatalf("models = %v, want %v", got, tc.want)
+					}
+				}
 			}
 		})
 	}

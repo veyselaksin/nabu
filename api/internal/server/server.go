@@ -40,10 +40,23 @@ type Translator interface {
 	Model() string
 }
 
+// ModelTranslator is a Translator that can also run with a specific backend
+// model, for servers hosting several pulled models. *translate.Translator
+// implements it.
+type ModelTranslator interface {
+	TranslateModel(ctx context.Context, text, model string) (*translate.Result, error)
+}
+
 // Pinger reports whether the translator's language model server is reachable.
 // *translate.Client implements it.
 type Pinger interface {
 	Ping(ctx context.Context) error
+}
+
+// ModelLister lists the models the language model server advertises.
+// *translate.Client implements it.
+type ModelLister interface {
+	Models(ctx context.Context) ([]string, error)
 }
 
 // Options configures a Server.
@@ -385,6 +398,9 @@ type translateRequest struct {
 	Text string `json:"text"`
 	// Lang is the target language; only "egy" (the default) is supported.
 	Lang string `json:"lang"`
+	// Model overrides the configured language model for this request, using a
+	// name advertised by the model server (see GET /v1/translator).
+	Model string `json:"model"`
 }
 
 const translateUnavailable = "translation is not configured on this server: set NABU_LLM_URL to an " +
@@ -410,7 +426,19 @@ func (s *Server) translate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res, err := s.opts.Translator.Translate(r.Context(), req.Text)
+	var res *translate.Result
+	var err error
+	if req.Model == "" {
+		res, err = s.opts.Translator.Translate(r.Context(), req.Text)
+	} else {
+		mt, ok := s.opts.Translator.(ModelTranslator)
+		if !ok {
+			writeError(w, http.StatusBadRequest, "invalid_request",
+				"this server cannot select a translation model per request", nil)
+			return
+		}
+		res, err = mt.TranslateModel(r.Context(), req.Text, req.Model)
+	}
 	var llmErr *translate.LLMError
 	switch {
 	case errors.Is(err, translate.ErrEmptyInput):
@@ -422,6 +450,9 @@ func (s *Server) translate(w http.ResponseWriter, r *http.Request) {
 	case err != nil && r.Context().Err() != nil:
 		writeError(w, http.StatusGatewayTimeout, "timeout",
 			"the language model took too long (NABU_TRANSLATE_TIMEOUT)", nil)
+		return
+	case errors.Is(err, translate.ErrModelOverride):
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error(), nil)
 		return
 	case errors.Is(err, translate.ErrModelOutput):
 		s.log.WarnContext(r.Context(), "unusable model output", "err", err)
@@ -440,9 +471,12 @@ func (s *Server) translate(w http.ResponseWriter, r *http.Request) {
 }
 
 type translatorResponse struct {
-	Available bool   `json:"available"`
-	Message   string `json:"message,omitempty"`
-	Model     string `json:"model,omitempty"`
+	Available bool     `json:"available"`
+	Message   string   `json:"message,omitempty"`
+	Model     string   `json:"model,omitempty"`
+	// Models are the model names the server advertises for per-request
+	// selection (omitted when they cannot be listed).
+	Models []string `json:"models,omitempty"`
 }
 
 // translator reports whether POST /v1/translate can work right now: it is
@@ -460,6 +494,12 @@ func (s *Server) translator(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusOK, translatorResponse{Model: model,
 				Message: "the language model server is not responding (" + err.Error() + "); start it, e.g. make run-llm"})
 			return
+		}
+		if l, ok := s.opts.TranslatorPing.(ModelLister); ok {
+			if models, err := l.Models(ctx); err == nil {
+				writeJSON(w, http.StatusOK, translatorResponse{Available: true, Model: model, Models: models})
+				return
+			}
 		}
 	}
 	writeJSON(w, http.StatusOK, translatorResponse{Available: true, Model: model})
