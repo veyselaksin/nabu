@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 )
 
@@ -35,7 +36,7 @@ type Client struct {
 	// BaseURL is the API root, e.g. http://127.0.0.1:8090/v1.
 	BaseURL string
 	// Model is sent as the "model" field (llama-server ignores it; Ollama
-	// needs a pulled model name such as qwen3:4b-instruct).
+	// needs a pulled model name such as qwen3.5:4b).
 	Model string
 	// APIKey, if set, is sent as a bearer token.
 	APIKey string
@@ -158,6 +159,44 @@ func (c *Client) Ping(ctx context.Context) error {
 		return &LLMError{Status: res.StatusCode, Msg: "GET /models failed"}
 	}
 	return nil
+}
+
+// Models lists the model names the server advertises via GET /models
+// (OpenAI format), sorted. It is how a caller discovers which pulled models
+// can be selected for translation.
+func (c *Client) Models(ctx context.Context) ([]string, error) {
+	req, err := c.newRequest(ctx, http.MethodGet, "/models", nil)
+	if err != nil {
+		return nil, &LLMError{Msg: "bad request", Err: err}
+	}
+	res, err := c.httpClient().Do(req)
+	if err != nil {
+		return nil, &LLMError{Msg: "not reachable at " + c.BaseURL, Err: err}
+	}
+	defer res.Body.Close()
+	raw, err := io.ReadAll(io.LimitReader(res.Body, maxReplyBytes))
+	if err != nil {
+		return nil, &LLMError{Msg: "reading reply", Err: err}
+	}
+	if res.StatusCode/100 != 2 {
+		return nil, &LLMError{Status: res.StatusCode, Msg: snippet(raw)}
+	}
+	var reply struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(raw, &reply); err != nil {
+		return nil, &LLMError{Msg: "reply is not a model list", Err: err}
+	}
+	ids := make([]string, 0, len(reply.Data))
+	for _, m := range reply.Data {
+		if m.ID != "" {
+			ids = append(ids, m.ID)
+		}
+	}
+	sort.Strings(ids)
+	return ids, nil
 }
 
 func snippet(b []byte) string {
